@@ -1,14 +1,14 @@
 @echo off
-echo = Получение обновлений из публичного репозитория (upstream) =
+echo = Getting updates from a public repository (upstream) =
 git fetch upstream
 
-echo = Обновление локальной ветки main из upstream/main =
+echo = Updating local branch main from upstream/main =
 git checkout master
 git merge upstream/master
 
-echo = Публикация обновлений в fork и в private =
+echo = Publishing updates to fork and private =
 git push fork master
 git push private master
 
-echo = Синхронизация завершена =
+echo = Synchronization completed =
 pause
