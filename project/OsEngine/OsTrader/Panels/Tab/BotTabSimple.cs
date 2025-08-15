@@ -4538,7 +4538,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                 return;
             }
 
-            if (StartProgram != StartProgram.IsOsTrader && StartProgram != StartProgram.IsTester)
+            if (StartProgram != StartProgram.IsOsTrader)
             {
                 SetNewLogMessage(OsLocalization.Trader.Label371, LogMessageType.Error);
                 return;

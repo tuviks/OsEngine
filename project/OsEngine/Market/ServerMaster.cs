@@ -1548,10 +1548,6 @@ namespace OsEngine.Market
                 {
                     serverPermission = new AscendexSpotServerPermission();
                 }
-                else if (type == ServerType.Tester)
-                {
-                    serverPermission = new TesterServerPermission();
-                }
 
                 if (serverPermission != null)
                 {
