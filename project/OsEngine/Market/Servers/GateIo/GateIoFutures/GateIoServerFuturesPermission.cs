@@ -252,6 +252,16 @@ namespace OsEngine.Market.Servers.GateIo.GateIoFutures
             get { return true; }
         }
 
+        public bool IsSupports_AsyncOrderSending
+        {
+            get { return false; }
+        }
+
+        public int AsyncOrderSending_RateGateLimitMls
+        {
+            get { return 10; }
+        }
+
         #endregion
     }
 }

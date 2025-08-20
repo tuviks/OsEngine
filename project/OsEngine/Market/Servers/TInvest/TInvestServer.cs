@@ -316,6 +316,8 @@ namespace OsEngine.Market.Servers.TInvest
 
         private Dictionary<string, int> _orderNumbers = new Dictionary<string, int>();
 
+        private string _orderNumbersLocker = "_orderNumbersLocker";
+
         #endregion
 
         #region 3 Securities
@@ -1670,13 +1672,13 @@ namespace OsEngine.Market.Servers.TInvest
                 {
                     if (ServerStatus == ServerConnectStatus.Disconnect)
                     {
-                        Thread.Sleep(1);
+                        Thread.Sleep(100);
                         continue;
                     }
 
                     if (_marketDataStream == null)
                     {
-                        Thread.Sleep(1);
+                        Thread.Sleep(100);
                         continue;
                     }
 
@@ -2540,12 +2542,16 @@ namespace OsEngine.Market.Servers.TInvest
 
                         Order order = new Order();
 
-                        if (!_orderNumbers.ContainsKey(state.OrderRequestId)) // значит сделка была вручную и это не наш ордер
+                        lock(_orderNumbersLocker)
                         {
-                            continue;
+                            if (!_orderNumbers.ContainsKey(state.OrderRequestId)) // значит сделка была вручную и это не наш ордер
+                            {
+                                continue;
+                            }
+
+                            order.NumberUser = _orderNumbers[state.OrderRequestId];
                         }
 
-                        order.NumberUser = _orderNumbers[state.OrderRequestId];
                         order.NumberMarket = state.OrderId;
                         order.SecurityNameCode = security.Name;
                         order.PortfolioNumber = state.AccountId;
@@ -2658,10 +2664,23 @@ namespace OsEngine.Market.Servers.TInvest
         #region 9 Trade
 
         private RateGate _rateGateOrders = new RateGate(100, TimeSpan.FromMinutes(1)); // https://russianinvestments.github.io/investAPI/limits/
+        private string _rageGateOrdersLocker = "_rageGateOrdersLocker";
+
+        private RateGate _rateGatePostOrders = new RateGate(300, TimeSpan.FromMinutes(1));
+        private string _rageGatePostOrdersLocker = "_rageGatePostOrdersLocker";
+
+        private RateGate _rateGateCancelOrders = new RateGate(100, TimeSpan.FromMinutes(1));
+        private string _rageGateCancelOrdersLocker = "_rageGateCancelOrdersLocker";
+
+        private RateGate _rateGateStatusOrders = new RateGate(200, TimeSpan.FromMinutes(1));
+        private string _rageGateStatusOrdersLocker = "_rageGateStatusOrdersLocker";
 
         public void SendOrder(Order order)
         {
-            _rateGateOrders.WaitToProceed();
+            lock(_rageGatePostOrdersLocker)
+            {
+                _rateGatePostOrders.WaitToProceed();
+            }
 
             try
             {
@@ -2693,7 +2712,10 @@ namespace OsEngine.Market.Servers.TInvest
                 Guid newUid = Guid.NewGuid();
                 string orderId = newUid.ToString();
 
-                _orderNumbers.Add(orderId, order.NumberUser);
+                lock (_orderNumbersLocker)
+                {
+                    _orderNumbers.Add(orderId, order.NumberUser);
+                }
 
                 request.OrderId = orderId;
 
@@ -2745,7 +2767,10 @@ namespace OsEngine.Market.Servers.TInvest
         {
             try
             {
-                _rateGateOrders.WaitToProceed();
+                lock(_rageGateOrdersLocker)
+                {
+                    _rateGateOrders.WaitToProceed();
+                }
 
                 if (order.TypeOrder == OrderPriceType.Market)
                 {
@@ -2753,25 +2778,31 @@ namespace OsEngine.Market.Servers.TInvest
                     return;
                 }
 
-                // remove old Uuid/NumberUser from list
-                foreach (KeyValuePair<string, int> kvp in _orderNumbers)
+                lock (_orderNumbersLocker)
                 {
-                    if (kvp.Value == order.NumberUser)
+                    // remove old Uuid/NumberUser from list
+                    foreach (KeyValuePair<string, int> kvp in _orderNumbers)
                     {
-                        _orderNumbers.Remove(kvp.Key);
-                        break;
+                        if (kvp.Value == order.NumberUser)
+                        {
+                            _orderNumbers.Remove(kvp.Key);
+                            break;
+                        }
                     }
                 }
-
                 ReplaceOrderRequest request = new ReplaceOrderRequest();
                 request.AccountId = order.PortfolioNumber;
                 request.OrderId = order.NumberMarket;
 
-                Guid newUid = Guid.NewGuid();
-                string orderId = newUid.ToString();
-                _orderNumbers.Add(orderId, order.NumberUser);
+                lock (_orderNumbersLocker)
+                {
+                    Guid newUid = Guid.NewGuid();
+                    string orderId = newUid.ToString();
 
-                request.IdempotencyKey = orderId;
+                    _orderNumbers.Add(orderId, order.NumberUser);
+                    request.IdempotencyKey = orderId;
+                }
+
                 request.Quantity = Convert.ToInt32(order.Volume - order.VolumeExecute);
 
                 if (request.Quantity <= 0 || order.State != OrderStateType.Active)
@@ -2823,7 +2854,12 @@ namespace OsEngine.Market.Servers.TInvest
                     // А теперь записываем новые данные для нового ордера
                     order.State = OrderStateType.Active;
                     order.NumberMarket = response.OrderId;
-                    order.NumberUser = _orderNumbers[response.OrderRequestId];
+
+                    lock(_orderNumbersLocker)
+                    {
+                        order.NumberUser = _orderNumbers[response.OrderRequestId];
+                    }
+                    
                     order.Price = newPrice;
                     order.Volume = request.Quantity;
                     order.VolumeExecute = 0;
@@ -2843,33 +2879,41 @@ namespace OsEngine.Market.Servers.TInvest
 
         List<string> _cancelOrderNums = new List<string>();
 
+        private string _cancelOrdersLocker = "_cancelOrdersLocker";
+
         public bool CancelOrder(Order order)
         {
-            _rateGateOrders.WaitToProceed();
-
             try
             {
-                int countTryRevokeOrder = 0;
-
-                for (int i = 0; i < _cancelOrderNums.Count; i++)
+                lock(_cancelOrdersLocker)
                 {
-                    if (_cancelOrderNums[i].Equals(order.NumberMarket))
+                    int countTryRevokeOrder = 0;
+
+                    for (int i = 0; i < _cancelOrderNums.Count; i++)
                     {
-                        countTryRevokeOrder++;
+                        if (_cancelOrderNums[i].Equals(order.NumberMarket))
+                        {
+                            countTryRevokeOrder++;
+                        }
+                    }
+
+                    if (countTryRevokeOrder >= 2)
+                    {
+                        SendLogMessage("Order cancel request error. The order has already been revoked " + order.SecurityClassCode, LogMessageType.Error);
+                        return false;
+                    }
+
+                    _cancelOrderNums.Add(order.NumberMarket);
+
+                    while (_cancelOrderNums.Count > 100)
+                    {
+                        _cancelOrderNums.RemoveAt(0);
                     }
                 }
 
-                if (countTryRevokeOrder >= 2)
+                lock (_rageGateCancelOrdersLocker)
                 {
-                    SendLogMessage("Order cancel request error. The order has already been revoked " + order.SecurityClassCode, LogMessageType.Error);
-                    return false;
-                }
-
-                _cancelOrderNums.Add(order.NumberMarket);
-
-                while (_cancelOrderNums.Count > 100)
-                {
-                    _cancelOrderNums.RemoveAt(0);
+                    _rateGateCancelOrders.WaitToProceed();
                 }
 
                 CancelOrderRequest request = new CancelOrderRequest();
@@ -2984,7 +3028,10 @@ namespace OsEngine.Market.Servers.TInvest
 
         public OrderStateType GetOrderStatusWithTrades(Order order, bool processTrades)
         {
-            _rateGateOrders.WaitToProceed();
+            lock(_rageGateStatusOrdersLocker)
+            {
+                _rateGateStatusOrders.WaitToProceed();
+            }
 
             try
             {
@@ -2996,7 +3043,6 @@ namespace OsEngine.Market.Servers.TInvest
                 OrderState state = null;
                 try
                 {
-                    _rateGateOrders.WaitToProceed();
                     state = _ordersClient.GetOrderState(getOrderStateRequest, _gRpcMetadata);
                 }
                 catch (RpcException ex)
@@ -3017,13 +3063,16 @@ namespace OsEngine.Market.Servers.TInvest
                 }
                 Order newOrder = new Order();
 
-                if (!_orderNumbers.ContainsKey(state.OrderRequestId))
+                lock(_orderNumbersLocker)
                 {
-                    order.NumberUser = order.NumberUser != 0 ? order.NumberUser : NumberGen.GetNumberOrder(StartProgram.IsOsTrader);
-                    _orderNumbers.Add(state.OrderRequestId, order.NumberUser);
+                    if (!_orderNumbers.ContainsKey(state.OrderRequestId))
+                    {
+                        order.NumberUser = order.NumberUser != 0 ? order.NumberUser : NumberGen.GetNumberOrder(StartProgram.IsOsTrader);
+                        _orderNumbers.Add(state.OrderRequestId, order.NumberUser);
+                    }
+                    newOrder.NumberUser = _orderNumbers[state.OrderRequestId];
                 }
-
-                newOrder.NumberUser = _orderNumbers[state.OrderRequestId];
+               
                 newOrder.NumberMarket = state.OrderId;
                 newOrder.SecurityNameCode = order.SecurityNameCode;
                 newOrder.PortfolioNumber = order.PortfolioNumber;
@@ -3137,6 +3186,12 @@ namespace OsEngine.Market.Servers.TInvest
         {
             _rateGateOrders.WaitToProceed();
 
+            if(_securities == null 
+                || _securities.Count == 0)
+            {
+                return null;
+            }
+
             try
             {
                 GetOrdersRequest getOrdersRequest = new GetOrdersRequest();
@@ -3152,6 +3207,11 @@ namespace OsEngine.Market.Servers.TInvest
                     {
                         OrderState state = response.Orders[i];
                         Security security = GetSecurity(state.InstrumentUid);
+
+                        if(security == null)
+                        {
+                            continue;
+                        }
 
                         Order newOrder = new Order();
 
@@ -3170,13 +3230,17 @@ namespace OsEngine.Market.Servers.TInvest
 
                         string orderId = state.OrderRequestId;
 
-                        if (_orderNumbers.ContainsKey(orderId))
+                        lock(_orderNumbersLocker)
                         {
-                            newOrder.NumberUser = _orderNumbers[orderId];
-                        }
-                        else
-                        {
-                            return null;
+                            if (_orderNumbers.ContainsKey(orderId))
+                            {
+                                newOrder.NumberUser = _orderNumbers[orderId];
+                            }
+                            else
+                            {
+                                return null;
+                            }
+
                         }
 
                         newOrder.NumberMarket = state.OrderId;

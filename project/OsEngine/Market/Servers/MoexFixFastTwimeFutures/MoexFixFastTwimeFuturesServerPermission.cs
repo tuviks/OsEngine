@@ -218,6 +218,16 @@ namespace OsEngine.Market.Servers.MoexFixFastTwimeFutures
             get { return false; }
         }
 
+        public bool IsSupports_AsyncOrderSending
+        {
+            get { return false; }
+        }
+
+        public int AsyncOrderSending_RateGateLimitMls
+        {
+            get { return 10; }
+        }
+
         #endregion
     }
 }

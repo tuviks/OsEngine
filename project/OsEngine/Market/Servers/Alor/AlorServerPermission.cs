@@ -236,6 +236,16 @@ namespace OsEngine.Market.Servers.Alor
             get { return true; }
         }
 
+        public bool IsSupports_AsyncOrderSending
+        {
+            get { return false; }
+        }
+
+        public int AsyncOrderSending_RateGateLimitMls
+        {
+            get { return 10; }
+        }
+
         #endregion
     }
 }
