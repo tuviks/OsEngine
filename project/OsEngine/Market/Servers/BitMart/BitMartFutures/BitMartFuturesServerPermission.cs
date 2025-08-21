@@ -230,7 +230,7 @@ namespace OsEngine.Market.Servers.BitMartFutures
 
         public bool IsSupports_CheckDataFeedLogic
         {
-            get { return false; }
+            get { return true; }
         }
 
         public string[] CheckDataFeedLogic_ExceptionSecuritiesClass
@@ -259,6 +259,16 @@ namespace OsEngine.Market.Servers.BitMartFutures
         }
 
         public int AsyncOrderSending_RateGateLimitMls
+        {
+            get { return 10; }
+        }
+
+        public bool IsSupports_AsyncCandlesStarter
+        {
+            get { return false; }
+        }
+
+        public int AsyncCandlesStarter_RateGateLimitMls
         {
             get { return 10; }
         }

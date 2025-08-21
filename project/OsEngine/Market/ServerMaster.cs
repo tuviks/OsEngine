@@ -84,6 +84,7 @@ using OsEngine.OsTrader;
 using OsEngine.OsTrader.Panels.Tab;
 using System.Linq;
 using OsEngine.Market.Servers.AscendexSpot;
+using OsEngine.Market.Servers.OKXData;
 
 namespace OsEngine.Market
 {
@@ -331,7 +332,6 @@ namespace OsEngine.Market
                 serverTypes.Add(ServerType.TelegramNews);
                 serverTypes.Add(ServerType.BinanceData);
                 serverTypes.Add(ServerType. AscendexSpot);
-               
 
                 // а теперь сортируем в зависимости от предпочтений пользователя
 
@@ -436,6 +436,7 @@ namespace OsEngine.Market
                 serverTypes.Add(ServerType.CoinExFutures);
                 serverTypes.Add(ServerType.BinanceData);
                 serverTypes.Add(ServerType.AscendexSpot);
+                serverTypes.Add(ServerType.OKXData);
 
                 return serverTypes;
             }
@@ -479,6 +480,32 @@ namespace OsEngine.Market
                 for (int i = 0; _servers != null && i < _servers.Count; i++)
                 {
                     types.Add(_servers[i].ServerType);
+                }
+
+                return types;
+            }
+        }
+
+        /// <summary>
+        /// array of active servers names
+        /// </summary>
+        public static List<string> ActiveServersUniqueNames
+        {
+            get
+            {
+                List<string> types = new List<string>();
+
+                for (int i = 0; _servers != null && i < _servers.Count; i++)
+                {
+                    string name = _servers[i].ServerNameAndPrefix;
+
+                    if(name.Split('_').Length == 3)
+                    {
+                        string shortName = name.Split("_")[0] + "_" + name.Split("_")[1];
+                        name = shortName;
+                    }
+
+                    types.Add(name);
                 }
 
                 return types;
@@ -540,6 +567,10 @@ namespace OsEngine.Market
 
                 IServer newServer = null;
 
+                if (type == ServerType.OKXData)
+                {
+                    newServer = new OKXDataServer();
+                }
                 if (type == ServerType.BinanceData)
                 {
                     newServer = new BinanceDataServer();
@@ -1537,6 +1568,10 @@ namespace OsEngine.Market
                 {
                     serverPermission = new AscendexSpotServerPermission();
                 }
+                else if (type == ServerType.OKXData)
+                {
+                    serverPermission = new OKXDataServerPermission();
+                }
 
                 if (serverPermission != null)
                 {
@@ -2318,6 +2353,12 @@ namespace OsEngine.Market
         /// <summary>
         ///  AscendexSpot exchange
         /// </summary>
-        AscendexSpot
+        AscendexSpot,
+
+        /// <summary>
+        /// downloading historical data from exchange OKX
+        /// скачивание исторических данных с биржи OKX
+        /// </summary>
+        OKXData
     }
 }

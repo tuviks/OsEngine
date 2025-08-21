@@ -1,15 +1,10 @@
-﻿/*
- *Your rights to use the code are governed by this license https://github.com/AlexWan/OsEngine/blob/master/LICENSE
- *Ваши права на использование кода регулируются данной лицензией http://o-s-a.net/doc/license_simple_engine.pdf
-*/
-
-namespace OsEngine.Market.Servers.OKX
+﻿namespace OsEngine.Market.Servers.OKXData
 {
-    class OkxServerPermission : IServerPermission
+    internal class OKXDataServerPermission : IServerPermission
     {
         public ServerType ServerType
         {
-            get { return ServerType.OKX; }
+            get { return ServerType.OKXData; }
         }
 
         #region DataFeedPermissions
@@ -36,16 +31,15 @@ namespace OsEngine.Market.Servers.OKX
         }
         public bool DataFeedTf20SecondCanLoad
         {
-            get { return false; ; }
+            get { return false; }
         }
         public bool DataFeedTf30SecondCanLoad
         {
             get { return false; }
         }
-
         public bool DataFeedTf1MinuteCanLoad
         {
-            get { return false; }
+            get { return true; }
         }
         public bool DataFeedTf2MinuteCanLoad
         {
@@ -81,7 +75,7 @@ namespace OsEngine.Market.Servers.OKX
         }
         public bool DataFeedTfDayCanLoad
         {
-            get { return false; }
+            get { return true; }
         }
         public bool DataFeedTfTickCanLoad
         {
@@ -89,56 +83,21 @@ namespace OsEngine.Market.Servers.OKX
         }
         public bool DataFeedTfMarketDepthCanLoad
         {
-            get { return true; }
+            get { return false; }
         }
 
         #endregion
 
         #region Trade permission
 
-        public int WaitTimeSecondsAfterFirstStartToSendOrders
-        {
-            get { return 1; }
-        }
-
-        public TimeFramePermission TradeTimeFramePermission
-        {
-            get { return _tradeTimeFramePermission; }
-        }
-
-        private TimeFramePermission _tradeTimeFramePermission
-            = new TimeFramePermission()
-            {
-                TimeFrameSec1IsOn = true,
-                TimeFrameSec2IsOn = true,
-                TimeFrameSec5IsOn = true,
-                TimeFrameSec10IsOn = true,
-                TimeFrameSec15IsOn = true,
-                TimeFrameSec20IsOn = true,
-                TimeFrameSec30IsOn = true,
-                TimeFrameMin1IsOn = true,
-                TimeFrameMin2IsOn = false,
-                TimeFrameMin3IsOn = true,
-                TimeFrameMin5IsOn = true,
-                TimeFrameMin10IsOn = false,
-                TimeFrameMin15IsOn = true,
-                TimeFrameMin20IsOn = false,
-                TimeFrameMin30IsOn = true,
-                TimeFrameMin45IsOn = false,
-                TimeFrameHour1IsOn = true,
-                TimeFrameHour2IsOn = true,
-                TimeFrameHour4IsOn = true,
-                TimeFrameDayIsOn = true
-            };
-
         public bool MarketOrdersIsSupport
         {
-            get { return true; }
+            get { return false; }
         }
 
         public bool IsTradeServer
         {
-            get { return true; }
+            get { return false; }
         }
 
         public bool IsCanChangeOrderPrice
@@ -146,14 +105,49 @@ namespace OsEngine.Market.Servers.OKX
             get { return false; }
         }
 
+        public TimeFramePermission TradeTimeFramePermission
+        {
+            get { return _tradeTimeFramePermission; }
+        }
+
+        public int WaitTimeSecondsAfterFirstStartToSendOrders
+        {
+            get { return 60; }
+        }
+
+        private TimeFramePermission _tradeTimeFramePermission
+            = new TimeFramePermission()
+            {
+                TimeFrameSec1IsOn = false,
+                TimeFrameSec2IsOn = false,
+                TimeFrameSec5IsOn = false,
+                TimeFrameSec10IsOn = false,
+                TimeFrameSec15IsOn = false,
+                TimeFrameSec20IsOn = false,
+                TimeFrameSec30IsOn = false,
+                TimeFrameMin1IsOn = false,
+                TimeFrameMin2IsOn = false,
+                TimeFrameMin3IsOn = false,
+                TimeFrameMin5IsOn = false,
+                TimeFrameMin10IsOn = false,
+                TimeFrameMin15IsOn = false,
+                TimeFrameMin20IsOn = false,
+                TimeFrameMin30IsOn = false,
+                TimeFrameMin45IsOn = false,
+                TimeFrameHour1IsOn = false,
+                TimeFrameHour2IsOn = false,
+                TimeFrameHour4IsOn = false,
+                TimeFrameDayIsOn = false
+            };
+
         public bool UseStandardCandlesStarter
         {
-            get { return true; }
+            get { return false; }
         }
 
         public bool IsUseLotToCalculateProfit
         {
-            get { return true; }
+            get { return false; }
         }
 
         public bool ManuallyClosePositionOnBoard_IsOn
@@ -168,30 +162,17 @@ namespace OsEngine.Market.Servers.OKX
 
         public string[] ManuallyClosePositionOnBoard_ExceptionPositionNames
         {
-            get
-            {
-                string[] values = new string[]
-                {
-                    "USDT",
-                    "USDC",
-                    "BTC",
-                    "ETH",
-                    "SOL",
-                    "BNB"
-                };
-
-                return values;
-            }
+            get { return null; }
         }
 
         public bool CanQueryOrdersAfterReconnect
         {
-            get { return true; }
+            get { return false; }
         }
 
         public bool CanQueryOrderStatus
         {
-            get { return true; }
+            get { return false; }
         }
 
         #endregion
@@ -205,7 +186,7 @@ namespace OsEngine.Market.Servers.OKX
 
         public bool IsSupports_CheckDataFeedLogic
         {
-            get { return true; }
+            get { return false; }
         }
 
         public string[] CheckDataFeedLogic_ExceptionSecuritiesClass
@@ -220,12 +201,12 @@ namespace OsEngine.Market.Servers.OKX
 
         public bool IsSupports_MultipleInstances
         {
-            get { return true; }
+            get { return false; }
         }
 
         public bool IsSupports_ProxyFor_MultipleInstances
         {
-            get { return true; }
+            get { return false; }
         }
 
         public bool IsSupports_AsyncOrderSending
@@ -250,4 +231,5 @@ namespace OsEngine.Market.Servers.OKX
 
         #endregion
     }
+
 }
