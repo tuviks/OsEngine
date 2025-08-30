@@ -2017,6 +2017,24 @@ namespace OsEngine.OsTrader.Grids
                 {
                     TradeGridLine curLine = linesAll[i];
 
+                    Position position = curLine.Position;
+
+                    if(position != null 
+                        && position.OpenVolume > 0)
+                    {
+                        continue;
+                    }
+
+                    if(Tab.Security.PriceLimitHigh != 0 
+                        && Tab.Security.PriceLimitLow != 0)
+                    {
+                        if(curLine.PriceEnter > Tab.Security.PriceLimitHigh 
+                            || curLine.PriceEnter <  Tab.Security.PriceLimitLow)
+                        {
+                            continue;
+                        }
+                    }
+
                     if (curLine.PriceEnter <= lastPrice)
                     {
                         linesWithOrdersToOpenNeed.Add(curLine);
@@ -2033,6 +2051,24 @@ namespace OsEngine.OsTrader.Grids
                 for (int i = 0; i < linesAll.Count; i++)
                 {
                     TradeGridLine curLine = linesAll[i];
+
+                    Position position = curLine.Position;
+
+                    if (position != null
+                        && position.OpenVolume > 0)
+                    {
+                        continue;
+                    }
+
+                    if (Tab.Security.PriceLimitHigh != 0
+                        && Tab.Security.PriceLimitLow != 0)
+                    {
+                        if (curLine.PriceEnter > Tab.Security.PriceLimitHigh
+                            || curLine.PriceEnter < Tab.Security.PriceLimitLow)
+                        {
+                            continue;
+                        }
+                    }
 
                     if (curLine.PriceEnter >= lastPrice)
                     {

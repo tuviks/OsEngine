@@ -630,17 +630,15 @@ namespace OsEngine.Market.Servers.TInvest
 
                     newSecurity.PriceStepCost = newSecurity.PriceStep;
 
-                    newSecurity.NameClass = SecurityType.Index.ToString() + " " + item.Currency;
+                    newSecurity.NameClass = SecurityType.Fund.ToString() + " " + item.Currency;
 
-                    newSecurity.SecurityType = SecurityType.Index;
+                    newSecurity.SecurityType = SecurityType.Fund;
                     newSecurity.Lot = item.Lot;
                     newSecurity.VolumeStep = 1;
-
 
                     newSecurity.State = SecurityStateType.Activ;
                     _securities.Add(newSecurity);
                 }
-
             }
             catch (Exception e)
             {
@@ -1805,7 +1803,16 @@ namespace OsEngine.Market.Servers.TInvest
                         depth.SecurityNameCode = security.Name;
                         depth.Time = marketDataResponse.Orderbook.Time.ToDateTime().AddHours(3);// convert to MSK
 
-
+                        if(marketDataResponse.Orderbook.LimitUp != null)
+                        {
+                            security.PriceLimitHigh = GetValue(marketDataResponse.Orderbook.LimitUp);
+                        }
+                        
+                        if(marketDataResponse.Orderbook.LimitDown != null)
+                        {
+                            security.PriceLimitLow = GetValue(marketDataResponse.Orderbook.LimitDown);
+                        }
+   
                         for (int i = 0; i < marketDataResponse.Orderbook.Bids.Count; i++)
                         {
                             MarketDepthLevel newBid = new MarketDepthLevel();
