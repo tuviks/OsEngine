@@ -1418,67 +1418,6 @@ namespace OsEngine.Market.Servers.Bybit
         public List<Trade> GetTickDataToSecurity(Security security, DateTime startTime, DateTime endTime, DateTime actualTime)
         {
             return null;
-            // ByBit returns no more than 1000 last ticks via API, which does not meet the connector requirements, so we will return null
-
-            List<Trade> trades = new List<Trade>();
-
-            try
-            {
-                string category = Category.spot.ToString();
-                if (security.Name.EndsWith(".P"))
-                {
-                    category = Category.linear.ToString();
-                }
-                else if (security.Name.EndsWith(".I"))
-                {
-                    category = Category.inverse.ToString();
-                }
-
-                Dictionary<string, object> parametrs = new Dictionary<string, object>();
-                parametrs.Add("category", category);
-                parametrs.Add("symbol", security.Name.Split('.')[0]);
-                parametrs.Add("limit", 1000);   // this is the maximum they give
-
-                string tradesQuery = CreatePublicQuery(parametrs, HttpMethod.Get, "/v5/market/recent-newTrade");
-
-                ResponseRestMessageList<RetTrade> responseTrades = JsonConvert.DeserializeObject<ResponseRestMessageList<RetTrade>>(tradesQuery);
-                if (responseTrades == null || responseTrades.result == null || responseTrades.result.list == null || responseTrades.result.list.Count == 0)
-                {
-                    return null;
-                }
-
-                List<RetTrade> retTrade = new List<RetTrade>();
-                retTrade = responseTrades.result.list;
-                DateTime preTime = DateTime.MinValue;
-
-                for (int i = retTrade.Count - 1; i >= 0; i--)
-                {
-                    RetTrade trade = retTrade[i];
-                    Trade newTrade = new Trade();
-                    newTrade.Id = trade.execId;
-                    newTrade.Price = trade.price.ToDecimal();
-                    newTrade.SecurityNameCode = trade.symbol;
-                    newTrade.Side = trade.side == "Buy" ? Side.Buy : Side.Sell;
-                    newTrade.Volume = trade.size.ToDecimal();
-                    DateTime tradeTime = DateTimeOffset.FromUnixTimeMilliseconds(long.Parse(trade.time)).UtcDateTime;
-                    if (tradeTime <= preTime)   // at the same moment in time, down to milliseconds, there can be several trades in buybit
-                    {
-                        // tradeTime = preTime.AddTicks(1);    // if several trades are not possible at the same time, then allow the row and add by tick
-                    }
-
-                    newTrade.Time = tradeTime;
-                    newTrade.MicroSeconds = 0;
-                    preTime = newTrade.Time;
-
-                    trades.Add(newTrade);
-                }
-                return trades;
-            }
-            catch (Exception ex)
-            {
-                SendLogMessage($"Trades request error. {ex.Message} {ex.StackTrace}", LogMessageType.Error);
-                return trades;
-            }
         }
 
         private List<Candle> GetListCandles(string candlesQuery)
@@ -1673,7 +1612,6 @@ namespace OsEngine.Market.Servers.Bybit
 
             return webSocketPublicOption;
         }
-
 
         private void CreatePrivateWebSocketConnect()
         {
@@ -2874,7 +2812,10 @@ namespace OsEngine.Market.Servers.Bybit
 
                     try
                     {
-                        newOrder.NumberUser = Convert.ToInt32(responseMyTrades.data[i].orderLinkId);
+                        if(string.IsNullOrEmpty(responseMyTrades.data[i].orderLinkId) == false)
+                        {
+                            newOrder.NumberUser = Convert.ToInt32(responseMyTrades.data[i].orderLinkId);
+                        }
                     }
                     catch
                     {
@@ -3813,22 +3754,23 @@ namespace OsEngine.Market.Servers.Bybit
 
                 if (place_order_response != null)
                 {
-                    ResponseRestMessageList<string> responseOrder = JsonConvert.DeserializeObject<ResponseRestMessageList<string>>(place_order_response);
+                    ResponseRestMessage<SendOrderResponse> responseOrder = JsonConvert.DeserializeObject<ResponseRestMessage<SendOrderResponse>>(place_order_response);
                     isSuccessful = responseOrder.retMsg;
 
                     if (responseOrder != null
                         && responseOrder.retCode == "0"
                         && isSuccessful == "OK")
                     {
-                        //Console.WriteLine("SendOrder - " + place_order_response.ToString());
-                        /*DateTime placedTime = DateTime.Now;
-                        order.State = OrderStateType.Activ;
-                        JToken ordChild = place_order_response.SelectToken("result.orderId");
-                        order.NumberMarket = ordChild.ToString();
-                        order.TimeCreate = DateTimeOffset.FromUnixTimeMilliseconds(place_order_response.SelectToken("time").Value<long>()).UtcDateTime;
-                        order.TimeCallBack = DateTimeOffset.FromUnixTimeMilliseconds(place_order_response.SelectToken("time").Value<long>()).UtcDateTime.Add(placedTime.Subtract(startTime));
-                        MyOrderEvent?.Invoke(order);
-                        */
+                        if (responseOrder.result.orderId != string.Empty)
+                        {
+                            DateTime placedTime = DateTime.Now;
+                            order.State = OrderStateType.Active;
+                            order.NumberMarket = responseOrder.result.orderId;
+                            order.TimeCreate = DateTimeOffset.FromUnixTimeMilliseconds(Convert.ToInt64(responseOrder.time)).UtcDateTime;
+                            order.TimeCallBack = DateTimeOffset.FromUnixTimeMilliseconds(Convert.ToInt64(responseOrder.time)).UtcDateTime.Add(placedTime.Subtract(startTime));
+                            MyOrderEvent?.Invoke(order);
+                        }
+
                         return;
                     }
                     else
@@ -4023,36 +3965,7 @@ namespace OsEngine.Market.Servers.Bybit
         {
             try
             {
-                List<Order> ordersOpenAll = new List<Order>();
-
-                List<Order> spotOrders = GetOpenOrders(Category.spot, null);
-
-                if (spotOrders != null
-                    && spotOrders.Count > 0)
-                {
-                    ordersOpenAll.AddRange(spotOrders);
-                }
-
-                List<Order> inverseOrders = GetOpenOrders(Category.inverse, null);
-
-                if (inverseOrders != null
-                    && inverseOrders.Count > 0)
-                {
-                    ordersOpenAll.AddRange(inverseOrders);
-                }
-
-                List<Order> linearOrders = null;
-
-                for (int i = 0; i < _listLinearCurrency.Count; i++)
-                {
-                    linearOrders = GetOpenOrders(Category.linear, _listLinearCurrency[i]);
-
-                    if (linearOrders != null
-                    && linearOrders.Count > 0)
-                    {
-                        ordersOpenAll.AddRange(linearOrders);
-                    }
-                }
+                List<Order> ordersOpenAll = GetAllOrdersArray(100,true);
 
                 for (int i = 0; i < ordersOpenAll.Count; i++)
                 {
@@ -4065,139 +3978,11 @@ namespace OsEngine.Market.Servers.Bybit
             }
         }
 
-        public OrderStateType GetOrderStatus(Order order)
-        {
-            try
-            {
-                Category category = Category.spot;
-
-
-                if (order.SecurityNameCode.EndsWith(".P"))
-                {
-                    category = Category.linear;
-                }
-                else if (order.SecurityNameCode.EndsWith(".I"))
-                {
-                    category = Category.inverse;
-                }
-
-                if (_securities != null)
-                {
-                    Security sec = _securities.Find(sec => sec.Name == order.SecurityNameCode);
-
-                    if (sec != null
-                        && sec.SecurityType == SecurityType.Option)
-                    {
-                        category = Category.option;
-                    }
-                }
-
-                Order newOrder = GetOrderFromHistory(order, category);
-
-                if (newOrder == null)
-                {
-                    List<Order> openOrders = null;
-
-                    if (category == Category.linear)
-                    {
-                        if (order.SecurityNameCode.Contains("USDT"))
-                        {
-                            openOrders = GetOpenOrders(category, "USDT");
-                        }
-                        else
-                        {
-                            openOrders = GetOpenOrders(category, "USDC");
-                        }
-                    }
-                    else if (category == Category.spot)
-                    {
-                        openOrders = GetOpenOrders(category, null);
-                    }
-                    else if (category == Category.inverse)
-                    {
-                        openOrders = GetOpenOrders(category, null);
-                    }
-                    else if (category == Category.option)
-                    {
-                        openOrders = GetOpenOrders(category, null);
-                    }
-
-                    for (int i = 0; openOrders != null && i < openOrders.Count; i++)
-                    {
-                        if (openOrders[i].NumberUser == order.NumberUser)
-                        {
-                            newOrder = openOrders[i];
-                            break;
-                        }
-                    }
-
-                    if (newOrder == null)
-                    {
-                        return OrderStateType.None;
-                    }
-                }
-
-                MyOrderEvent?.Invoke(newOrder);
-
-                // check trades
-
-                if (newOrder.State == OrderStateType.Active
-                    || newOrder.State == OrderStateType.Partial
-                    || newOrder.State == OrderStateType.Done
-                    || newOrder.State == OrderStateType.Cancel)
-                {
-                    List<MyTrade> myTrades = GetMyTradesHistory(newOrder, category);
-
-                    for (int i = 0; myTrades != null && i < myTrades.Count; i++)
-                    {
-                        MyTradeEvent?.Invoke(myTrades[i]);
-                    }
-                }
-
-                return newOrder.State;
-            }
-            catch (Exception ex)
-            {
-                SendLogMessage($"GetOrderStatus>. Order error. {ex.Message} {ex.StackTrace}", LogMessageType.Error);
-            }
-
-            return OrderStateType.None;
-        }
-
         public void GetAllActivOrders()
         {
             try
             {
-                List<Order> ordersOpenAll = new List<Order>();
-
-                List<Order> spotOrders = GetOpenOrders(Category.spot, null);
-
-                if (spotOrders != null
-                    && spotOrders.Count > 0)
-                {
-                    ordersOpenAll.AddRange(spotOrders);
-                }
-
-                List<Order> inverseOrders = GetOpenOrders(Category.inverse, null);
-
-                if (inverseOrders != null
-                    && inverseOrders.Count > 0)
-                {
-                    ordersOpenAll.AddRange(inverseOrders);
-                }
-
-                List<Order> linearOrders = null;
-
-                for (int i = 0; i < _listLinearCurrency.Count; i++)
-                {
-                    linearOrders = GetOpenOrders(Category.linear, _listLinearCurrency[i]);
-
-                    if (linearOrders != null
-                    && linearOrders.Count > 0)
-                    {
-                        ordersOpenAll.AddRange(linearOrders);
-                    }
-                }
+                List<Order> ordersOpenAll = GetAllOrdersArray(100, true);
 
                 for (int i = 0; i < ordersOpenAll.Count; i++)
                 {
@@ -4210,14 +3995,66 @@ namespace OsEngine.Market.Servers.Bybit
             }
         }
 
-        private List<Order> GetOpenOrders(Category category, string settleCoin)
+        private List<Order> GetAllOrdersArray(int maxCountByCategory, bool onlyActive)
+        {
+            List<Order> ordersOpenAll = new List<Order>();
+
+            List<Order> spotOrders = new List<Order>();
+            GetOrders(Category.spot, null, spotOrders, null, maxCountByCategory, onlyActive);
+
+            if (spotOrders != null
+                && spotOrders.Count > 0)
+            {
+                ordersOpenAll.AddRange(spotOrders);
+            }
+
+            List<Order> inverseOrders = new List<Order>();
+            GetOrders(Category.inverse, null, inverseOrders, null, maxCountByCategory, onlyActive);
+
+            if (inverseOrders != null
+                && inverseOrders.Count > 0)
+            {
+                ordersOpenAll.AddRange(inverseOrders);
+            }
+
+            List<Order> linearOrders = new List<Order>();
+
+            for (int i = 0; i < _listLinearCurrency.Count; i++)
+            {
+                GetOrders(Category.linear, _listLinearCurrency[i], linearOrders, null, maxCountByCategory, onlyActive);
+
+                if (linearOrders != null
+                && linearOrders.Count > 0)
+                {
+                    ordersOpenAll.AddRange(linearOrders);
+                }
+            }
+
+            return ordersOpenAll;
+        }
+
+        private void GetOrders(Category category, string settleCoin, List<Order> array, string cursor, int maxCount, bool onlyActive)
         {
             try
             {
                 Dictionary<string, object> parameters = new Dictionary<string, object>();
 
                 parameters["category"] = category;
-                parameters["openOnly"] = "0";
+                parameters["limit"] = "50";
+
+                if(onlyActive)
+                {
+                    parameters["openOnly"] = "0";
+                }
+                else
+                {
+                    parameters["openOnly"] = "1";
+                }
+
+                if (cursor != null)
+                {
+                    parameters["cursor"] = cursor;
+                }
 
                 if (category == Category.linear)
                 {
@@ -4228,8 +4065,10 @@ namespace OsEngine.Market.Servers.Bybit
 
                 if (orders_response == null)
                 {
-                    return null;
+                    return;
                 }
+
+                //RetResalt result = JsonConvert.DeserializeObject <nRetResalt> (orders_response);
 
                 ResponseRestMessageList<ResponseMessageOrders> responseOrder = JsonConvert.DeserializeObject<ResponseRestMessageList<ResponseMessageOrders>>(orders_response);
 
@@ -4246,7 +4085,33 @@ namespace OsEngine.Market.Servers.Bybit
                         ResponseMessageOrders order = ordChild[i];
 
                         Order newOrder = new Order();
-                        newOrder.State = OrderStateType.Active;
+                        newOrder.ServerType = this.ServerType;
+
+                        if(order.orderStatus == "Cancelled"
+                            || order.orderStatus == "Rejected"
+                            || order.orderStatus == "PartiallyFilledCanceled"
+                            || order.orderStatus == "Deactivated")
+                        {
+                            newOrder.State = OrderStateType.Cancel;
+                            newOrder.TimeCancel = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(order.updatedTime));
+                        }
+                        else if(order.orderStatus == "Filled")
+                        {
+                            newOrder.State = OrderStateType.Done;                           
+                            newOrder.TimeDone = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(order.updatedTime));
+                        }
+                        else if (order.orderStatus == "New"
+                            || order.orderStatus == "PartiallyFilled"
+                            || order.orderStatus == "Untriggered")
+                        {
+                            newOrder.State = OrderStateType.Active;
+                        }
+
+                        if (order.cumExecQty != null)
+                        {
+                            newOrder.VolumeExecute = order.cumExecQty.ToDecimal();
+                        }
+
                         newOrder.TypeOrder = OrderPriceType.Limit;
                         newOrder.PortfolioNumber = "BybitUNIFIED";
 
@@ -4299,137 +4164,51 @@ namespace OsEngine.Market.Servers.Bybit
                         activeOrders.Add(newOrder);
                     }
 
-                    return activeOrders;
+                    if(activeOrders.Count > 0)
+                    {
+                        array.AddRange(activeOrders);
+
+                        if(array.Count > maxCount)
+                        {
+                            while(array.Count > maxCount)
+                            {
+                                array.RemoveAt(array.Count - 1);
+                            }
+                            return;
+                        }
+                        else if(array.Count < 50)
+                        {
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        return;
+                    }
+
+                    if (ordChild.Count > 1)
+                    {
+                        cursor = responseOrder.result.nextPageCursor;
+
+                        if (cursor != null)
+                        {
+                            GetOrders(category, settleCoin, array, cursor, maxCount, onlyActive);
+                        }
+                    }
+
+                    return;
                 }
                 else
                 {
                     SendLogMessage($"GetOpenOrders>. Order error. Code: {responseOrder.retCode}\n"
                             + $"Message: {responseOrder.retMsg}", LogMessageType.Error);
-                    return null;
+                    return;
                 }
             }
             catch (Exception ex)
             {
                 SendLogMessage($"GetOpenOrders>. Order error. {ex.Message} {ex.StackTrace}", LogMessageType.Error);
-                return null;
-            }
-        }
-
-        private Order GetOrderFromHistory(Order orderBase, Category category)
-        {
-            try
-            {
-                Dictionary<string, object> parameters = new Dictionary<string, object>();
-
-                parameters["category"] = category;
-                parameters["symbol"] = orderBase.SecurityNameCode.Split('.')[0].ToUpper();
-
-                string orders_response = CreatePrivateQuery(parameters, HttpMethod.Get, "/v5/order/history");
-
-                if (orders_response == null)
-                {
-                    return null;
-                }
-
-                ResponseRestMessageList<ResponseMessageOrders> responseOrder = JsonConvert.DeserializeObject<ResponseRestMessageList<ResponseMessageOrders>>(orders_response);
-
-                if (responseOrder != null
-                     && responseOrder.retCode == "0"
-                     && responseOrder.retMsg == "OK")
-                {
-                    List<ResponseMessageOrders> ordChild = responseOrder.result.list;
-
-                    for (int i = 0; i < ordChild.Count; i++)
-                    {
-                        ResponseMessageOrders order = ordChild[i];
-                        Order newOrder = new Order();
-                        string status = order.orderStatus;
-
-                        OrderStateType stateType = status.ToUpper() switch
-                        {
-                            "CREATED" => OrderStateType.Active,
-                            "NEW" => OrderStateType.Active,
-                            "ORDER_NEW" => OrderStateType.Active,
-                            "PARTIALLYFILLED" => OrderStateType.Active,
-                            "FILLED" => OrderStateType.Done,
-                            "ORDER_FILLED" => OrderStateType.Done,
-                            "CANCELLED" => OrderStateType.Cancel,
-                            "ORDER_CANCELLED" => OrderStateType.Cancel,
-                            "PARTIALLYFILLEDCANCELED" => OrderStateType.Partial,
-                            "REJECTED" => OrderStateType.Fail,
-                            "ORDER_REJECTED" => OrderStateType.Fail,
-                            "ORDER_FAILED" => OrderStateType.Fail,
-                            _ => OrderStateType.Cancel,
-                        };
-
-                        newOrder.State = stateType;
-                        newOrder.TypeOrder = OrderPriceType.Limit;
-                        newOrder.PortfolioNumber = "BybitUNIFIED";
-                        newOrder.NumberMarket = order.orderId;
-                        newOrder.SecurityNameCode = order.symbol;
-
-                        if (category == Category.linear
-                            && newOrder.SecurityNameCode.EndsWith(".P") == false)
-                        {
-                            newOrder.SecurityNameCode = newOrder.SecurityNameCode + ".P";
-                        }
-
-                        if (category == Category.inverse
-                            && newOrder.SecurityNameCode.EndsWith(".I") == false)
-                        {
-                            newOrder.SecurityNameCode = newOrder.SecurityNameCode + ".I";
-                        }
-
-                        newOrder.Price = order.price.ToDecimal();
-                        newOrder.Volume = order.qty.ToDecimal();
-                        newOrder.TimeCallBack = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(order.updatedTime));
-                        newOrder.TimeCreate = newOrder.TimeCallBack;
-
-                        string numUser = order.orderLinkId;
-
-                        if (string.IsNullOrEmpty(numUser) == false)
-                        {
-                            try
-                            {
-                                newOrder.NumberUser = Convert.ToInt32(numUser);
-                            }
-                            catch
-                            {
-                                // ignore
-                            }
-                        }
-
-                        if (newOrder.NumberUser != orderBase.NumberUser)
-                        {
-                            continue;
-                        }
-
-                        string side = order.side;
-
-                        if (side == "Buy")
-                        {
-                            newOrder.Side = Side.Buy;
-                        }
-                        else
-                        {
-                            newOrder.Side = Side.Sell;
-                        }
-
-                        return newOrder;
-                    }
-                }
-                else
-                {
-                    SendLogMessage($"GetOrderFromHistory>. Order error. Code: {responseOrder.retCode}\n"
-                            + $"Message: {responseOrder.retMsg}", LogMessageType.Error);
-                }
-
-                return null;
-            }
-            catch (Exception ex)
-            {
-                SendLogMessage($"GetOrderFromHistory>. Order error. {ex.Message} {ex.StackTrace}", LogMessageType.Error);
-                return null;
+                return;
             }
         }
 
@@ -4515,6 +4294,146 @@ namespace OsEngine.Market.Servers.Bybit
                 SendLogMessage($"GetMyTradesHistory>. Order error. {ex.Message} {ex.StackTrace}", LogMessageType.Error);
                 return null;
             }
+        }
+
+        public List<Order> GetActiveOrders(int startIndex, int count)
+        {
+            int countToMethod = startIndex + count;
+
+            List<Order> result = GetAllOrdersArray(countToMethod, true);
+
+            List<Order> resultExit = new List<Order>();
+
+            if (result != null 
+                && startIndex <  result.Count)
+            {
+                if(startIndex + count < result.Count)
+                {
+                    resultExit = result.GetRange(startIndex, count);
+                }
+                else
+                {
+                    resultExit = result.GetRange(startIndex, result.Count - startIndex);
+                }
+            }
+
+            return resultExit;
+        }
+
+        public List<Order> GetHistoricalOrders(int startIndex, int count)
+        {
+            int countToMethod = startIndex + count;
+
+            List<Order> result = GetAllOrdersArray(countToMethod, false);
+
+            List<Order> resultExit = new List<Order>();
+
+            if (result != null
+                && startIndex < result.Count)
+            {
+                if (startIndex + count < result.Count)
+                {
+                    resultExit = result.GetRange(startIndex, count);
+                }
+                else
+                {
+                    resultExit = result.GetRange(startIndex, result.Count - startIndex);
+                }
+            }
+
+            return resultExit;
+        }
+
+        private List<Order> _activeOrdersCash = new List<Order>();
+        private List<Order> _historicalOrdersCash = new List<Order>();
+        private DateTime _timeOrdersCashCreate;
+        public OrderStateType GetOrderStatus(Order order)
+        {
+            try
+            {
+                Category category = Category.spot;
+
+                if (order.SecurityNameCode.EndsWith(".P"))
+                {
+                    category = Category.linear;
+                }
+                else if (order.SecurityNameCode.EndsWith(".I"))
+                {
+                    category = Category.inverse;
+                }
+
+                if (_securities != null)
+                {
+                    Security sec = _securities.Find(sec => sec.Name == order.SecurityNameCode);
+
+                    if (sec != null
+                        && sec.SecurityType == SecurityType.Option)
+                    {
+                        category = Category.option;
+                    }
+                }
+
+                if (_timeOrdersCashCreate.AddSeconds(2) < DateTime.Now)
+                {
+                    // обновляем массивы ордеров один раз в две секунды.
+                    // Формируем КЭШ для массового запроса статусов на реконнекте
+                    _historicalOrdersCash = GetHistoricalOrders(0, 100);
+                    _activeOrdersCash = GetActiveOrders(0, 100);
+                    _timeOrdersCashCreate = DateTime.Now;
+                }
+
+                Order myOrder = null;
+
+                for(int i = 0; _historicalOrdersCash != null && i < _historicalOrdersCash.Count;i++)
+                {
+                    if (_historicalOrdersCash[i].NumberUser == order.NumberUser)
+                    {
+                        myOrder = _historicalOrdersCash[i];
+                        break;
+                    }
+                }
+
+                if(myOrder == null)
+                {
+                    for (int i = 0; _activeOrdersCash != null && i < _activeOrdersCash.Count; i++)
+                    {
+                        if (_activeOrdersCash[i].NumberUser == order.NumberUser)
+                        {
+                            myOrder = _activeOrdersCash[i];
+                            break;
+                        }
+                    }
+                }
+
+                if (myOrder == null)
+                {
+                    return OrderStateType.None;
+                }
+
+                MyOrderEvent?.Invoke(myOrder);
+
+                // check trades
+
+                if (myOrder.State == OrderStateType.Partial
+                    || myOrder.State == OrderStateType.Done
+                    || myOrder.VolumeExecute != 0)
+                {
+                    List<MyTrade> myTrades = GetMyTradesHistory(myOrder, category);
+
+                    for (int i = 0; myTrades != null && i < myTrades.Count; i++)
+                    {
+                        MyTradeEvent?.Invoke(myTrades[i]);
+                    }
+                }
+
+                return myOrder.State;
+            }
+            catch (Exception ex)
+            {
+                SendLogMessage($"GetOrderStatus>. Order error. {ex.Message} {ex.StackTrace}", LogMessageType.Error);
+            }
+
+            return OrderStateType.None;
         }
 
         #endregion 11
@@ -4673,7 +4592,11 @@ namespace OsEngine.Market.Servers.Bybit
             }
             catch (Exception ex)
             {
-                SendLogMessage(ex.Message, LogMessageType.Error);
+                if(ex.Message.Contains("A task was canceled") == false)
+                {
+                    SendLogMessage(ex.Message, LogMessageType.Error);
+                }
+
                 return null;
             }
         }

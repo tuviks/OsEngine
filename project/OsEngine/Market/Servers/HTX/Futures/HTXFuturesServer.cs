@@ -1391,6 +1391,7 @@ namespace OsEngine.Market.Servers.HTX.Futures
 
                 jsonContent.Add("lever_rate", "10");
                 jsonContent.Add("order_price_type", "limit");
+                jsonContent.Add("channel_code", "AAe2ccbd47");
 
                 string url = _privateUriBuilder.Build("POST", "/api/v1/contract_order");
 
@@ -1675,7 +1676,16 @@ namespace OsEngine.Market.Servers.HTX.Futures
                         newOrder.TimeCreate = TimeManager.GetDateTimeFromTimeStamp(long.Parse(item[0].created_at));
                         newOrder.ServerType = ServerType.HTXFutures;
                         newOrder.SecurityNameCode = JoinSecurityName(item[0].symbol, item[0].contract_type);
-                        newOrder.NumberUser = Convert.ToInt32(item[0].client_order_id);
+
+                        try
+                        {
+                            newOrder.NumberUser = Convert.ToInt32(item[0].client_order_id);
+                        }
+                        catch
+                        {
+                            // ignore
+                        }
+
                         newOrder.NumberMarket = item[0].order_id.ToString();
                         newOrder.Side = item[0].direction.Equals("buy") ? Side.Buy : Side.Sell;
                         newOrder.State = GetOrderState(item[0].status);
@@ -1735,7 +1745,7 @@ namespace OsEngine.Market.Servers.HTX.Futures
                         {
                             MyTrade newTrade = new MyTrade();
                             newTrade.SecurityNameCode = orderResponse.data.symbol;
-                            newTrade.NumberTrade = orderResponse.data.trades[i].trade_id;
+                            newTrade.NumberTrade = orderResponse.data.trades[i].id;
                             newTrade.NumberOrderParent = orderResponse.data.order_id;
                             newTrade.Volume = orderResponse.data.trades[i].trade_volume.ToDecimal();
                             newTrade.Price = orderResponse.data.trades[i].trade_price.ToDecimal();
@@ -1773,6 +1783,16 @@ namespace OsEngine.Market.Servers.HTX.Futures
             {
                 SendLogMessage("Get all orders request error." + exception.ToString(), LogMessageType.Error);
             }
+            return null;
+        }
+
+        public List<Order> GetActiveOrders(int startIndex, int count)
+        {
+            return null;
+        }
+
+        public List<Order> GetHistoricalOrders(int startIndex, int count)
+        {
             return null;
         }
 

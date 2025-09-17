@@ -116,19 +116,26 @@ namespace OsEngine.Market.Servers.Woo.Entity
         public string quantity { get; set; }
     }
 
-    public class ResponseMessagePositions
+    public class ResponseFuturesPositions
     {
-        public Data data { get; set; }
+        public List<FuturesPosition> positions { get; set; }
+    }
 
-        public class Data
-        {
-            public List<Positions> positions { get; set; }
-        }
-        public class Positions
-        {
-            public string symbol { get; set; }
-            public string holding { get; set; }
-        }
+    public class FuturesPosition
+    {
+        public string symbol { get; set; }
+        public string holding { get; set; }
+        public string positionSide { get; set; }
+        public string pendingLongQty { get; set; }
+        public string pendingShortQty { get; set; }
+        public string settlePrice { get; set; }
+        public string averageOpenPrice { get; set; }
+        public string pnl24H { get; set; }
+        public string fee24H { get; set; }
+        public string markPrice { get; set; }
+        public string estLiqPrice { get; set; }
+        public string adlQuantile { get; set; }
+        public string timestamp { get; set; }
     }
 
     public class ResponseCandles
@@ -220,5 +227,37 @@ namespace OsEngine.Market.Servers.Woo.Entity
         public string feeAsset { get; set; }
         public string realizedPnl { get; set; }
         public string executedTimestamp { get; set; }
+    }
+
+    public class FundingHistoryData
+    {
+        public MetaPages meta { get; set; }
+        public List<RowFunding> rows { get; set; }
+    }
+
+    public class RowFunding
+    {
+        public string symbol { get; set; }
+        public string fundingRate { get; set; }
+        public string fundingRateTimestamp { get; set; }
+        public string nextFundingTime { get; set; }
+        public string markPrice { get; set; }
+    }
+
+    public class EstimatedFundingRateData
+    {
+        public List<EstimatedFundingRateRow> rows { get; set; }
+    }
+
+    public class EstimatedFundingRateRow
+    {
+        public string symbol { get; set; }
+        public string estFundingRate { get; set; }
+        public string estFundingRateTimestamp { get; set; }
+        public string lastFundingRate { get; set; }
+        public string lastFundingRateTimestamp { get; set; }
+        public string nextFundingTime { get; set; }
+        public string lastFundingIntervalHours { get; set; }
+        public string estFundingIntervalHours { get; set; }
     }
 }

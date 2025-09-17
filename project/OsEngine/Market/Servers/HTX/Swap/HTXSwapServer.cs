@@ -2151,7 +2151,14 @@ namespace OsEngine.Market.Servers.HTX.Swap
 
                 myTrade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(response.trade[i].created_at));
                 myTrade.NumberOrderParent = response.order_id;
-                myTrade.NumberTrade = response.trade[i].id;
+
+                string num = response.trade[i].id;
+                //if (num.Split('-').Length < 2)
+                //{
+                //    continue;
+                //}
+
+                myTrade.NumberTrade = num;
                 myTrade.Price = response.trade[i].trade_price.ToDecimal();
                 myTrade.SecurityNameCode = response.contract_code;
                 myTrade.Side = response.direction.Equals("buy") ? Side.Buy : Side.Sell;
@@ -2402,7 +2409,7 @@ namespace OsEngine.Market.Servers.HTX.Swap
                         pos.ValueCurrent = -item[i].volume.ToDecimal();
                     }
 
-                    pos.ValueBlocked = item[i].frozen.ToDecimal();
+                    //pos.ValueBlocked = item[i].frozen.ToDecimal();
                     pos.UnrealizedPnl = Math.Round(item[i].profit_unreal.ToDecimal(), 5);
                     //resultPnL += pos.UnrealizedPnl;
 
@@ -2533,6 +2540,8 @@ namespace OsEngine.Market.Servers.HTX.Swap
                 {
                     jsonContent.Add("order_price_type", "market");
                 }
+
+                jsonContent.Add("channel_code", "AAe2ccbd47");
 
                 string url = _privateUriBuilder.Build("POST", $"{_pathRest}/v1/swap_order");
 
@@ -2727,7 +2736,16 @@ namespace OsEngine.Market.Servers.HTX.Swap
                             newOrder.TimeCreate = TimeManager.GetDateTimeFromTimeStamp(long.Parse(item.created_at));
                             newOrder.ServerType = ServerType.HTXSwap;
                             newOrder.SecurityNameCode = item.contract_code;
-                            newOrder.NumberUser = Convert.ToInt32(item.client_order_id);
+
+                            try
+                            {
+                                newOrder.NumberUser = Convert.ToInt32(item.client_order_id);
+                            }
+                            catch
+                            {
+
+                            }
+
                             newOrder.NumberMarket = item.order_id.ToString();
                             newOrder.Side = item.direction.Equals("buy") ? Side.Buy : Side.Sell;
                             newOrder.State = GetOrderState(item.status);
@@ -2901,7 +2919,7 @@ namespace OsEngine.Market.Servers.HTX.Swap
                                 newOrder.TypeOrder = OrderPriceType.Market;
                             }
 
-                            //newOrder.PositionConditionType = item[0].offset == "open" ? OrderPositionConditionType.Open : OrderPositionConditionType.Close;
+                            //newOrder.PositionConditionType = item.offset == "open" ? OrderPositionConditionType.Open : OrderPositionConditionType.Close;
                         }
 
                         return newOrder;
@@ -2956,7 +2974,14 @@ namespace OsEngine.Market.Servers.HTX.Swap
                             {
                                 MyTrade newTrade = new MyTrade();
                                 newTrade.SecurityNameCode = response.data.contract_code;
-                                newTrade.NumberTrade = response.data.trades[i].trade_id;
+
+                                string num = response.data.trades[i].id;
+                                //if(num.Split('-').Length < 2)
+                                //{
+                                //    continue;
+                                //}
+
+                                newTrade.NumberTrade = num;
                                 newTrade.NumberOrderParent = response.data.order_id;
                                 newTrade.Volume = response.data.trades[i].trade_volume.ToDecimal();
                                 newTrade.Price = response.data.trades[i].trade_price.ToDecimal();
@@ -2970,6 +2995,7 @@ namespace OsEngine.Market.Servers.HTX.Swap
                                 {
                                     newTrade.Side = Side.Sell;
                                 }
+
                                 osEngineOrders.Add(newTrade);
                             }
                         }
@@ -2999,6 +3025,16 @@ namespace OsEngine.Market.Servers.HTX.Swap
             {
                 SendLogMessage("Get my trades by security request error." + exception.ToString(), LogMessageType.Error);
             }
+            return null;
+        }
+
+        public List<Order> GetActiveOrders(int startIndex, int count)
+        {
+            return null;
+        }
+
+        public List<Order> GetHistoricalOrders(int startIndex, int count)
+        {
             return null;
         }
 

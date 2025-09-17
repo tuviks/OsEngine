@@ -7,6 +7,7 @@ using OsEngine.Entity;
 using OsEngine.Language;
 using OsEngine.Logging;
 using OsEngine.Market;
+using OsEngine.Market.Servers;
 using OsEngine.OsTrader.Panels.Tab;
 using System;
 using System.Collections.Generic;
@@ -114,6 +115,8 @@ namespace OsEngine.OsTrader.Grids
             result += _firstTradeTime.ToString(CultureInfo.InvariantCulture) + "@";
             result += DelayInReal + "@";
             result += CheckMicroVolumes + "@";
+            result += MaxDistanceToOrdersPercent + "@";
+            result += "@";
 
             result += "%";
 
@@ -173,7 +176,7 @@ namespace OsEngine.OsTrader.Grids
                 _firstTradePrice = values[8].ToDecimal();
                 _openPositionsBySession = Convert.ToInt32(values[9]);
                 _firstTradeTime = Convert.ToDateTime(values[10], CultureInfo.InvariantCulture);
-
+                
                 try
                 {
                     DelayInReal = Convert.ToInt32(values[11]);
@@ -183,6 +186,15 @@ namespace OsEngine.OsTrader.Grids
                 {
                     DelayInReal = 500;
                     CheckMicroVolumes = true;
+                }
+
+                try
+                {
+                    MaxDistanceToOrdersPercent = values[13].ToDecimal();
+                }
+                catch
+                {
+                    MaxDistanceToOrdersPercent = 1.5m;
                 }
 
                 // non trade periods
@@ -337,7 +349,7 @@ namespace OsEngine.OsTrader.Grids
 
         public TradeGridLogicEntryRegime RegimeLogicEntry;
 
-        public bool AutoClearJournalIsOn;
+        public bool AutoClearJournalIsOn = true;
 
         public int MaxClosePositionsInJournal = 100;
 
@@ -348,6 +360,8 @@ namespace OsEngine.OsTrader.Grids
         public int DelayInReal = 500;
 
         public bool CheckMicroVolumes = true;
+
+        public decimal MaxDistanceToOrdersPercent = 0.3m;
 
         #endregion
 
@@ -637,10 +651,25 @@ namespace OsEngine.OsTrader.Grids
                 return;
             }
 
+            if(StartProgram == StartProgram.IsOsTrader 
+               && ErrorsReaction.WaitOnStartConnectorIsOn == true)
+            {
+                IServer server = Tab.Connector.MyServer;
+
+                if(server.GetType().BaseType.Name == "AServer")
+                {
+                    if(ErrorsReaction.AwaitOnStartConnector((AServer)server) == true)
+                    {
+                        return;
+                    }
+                }
+            }
+
             TradeGridRegime baseRegime = Regime;
 
             // 1 Авто-старт сетки, если выключено
-            if (baseRegime == TradeGridRegime.Off)
+            if (baseRegime == TradeGridRegime.Off ||
+                baseRegime == TradeGridRegime.OffAndCancelOrders)
             {
                 if (StartProgram == StartProgram.IsOsTrader)
                 {
@@ -684,20 +713,28 @@ namespace OsEngine.OsTrader.Grids
 
                 // отзываем ордера с рынка
 
-                int countRejectOrders = TryCancelClosingOrders();
-
-                if (countRejectOrders > 0)
+                if (HaveOrdersTryToCancelLastSecond())
                 {
-                    _vacationTime = DateTime.Now.AddMilliseconds(DelayInReal * countRejectOrders);
                     return;
                 }
 
-                countRejectOrders = TryCancelOpeningOrders();
-
-                if (countRejectOrders > 0)
+                if (baseRegime == TradeGridRegime.OffAndCancelOrders)
                 {
-                    _vacationTime = DateTime.Now.AddMilliseconds(DelayInReal * countRejectOrders);
-                    return;
+                    int countRejectOrders = TryCancelClosingOrders();
+
+                    if (countRejectOrders > 0)
+                    {
+                        _vacationTime = DateTime.Now.AddMilliseconds(DelayInReal * countRejectOrders);
+                        return;
+                    }
+
+                    countRejectOrders = TryCancelOpeningOrders();
+
+                    if (countRejectOrders > 0)
+                    {
+                        _vacationTime = DateTime.Now.AddMilliseconds(DelayInReal * countRejectOrders);
+                        return;
+                    }
                 }
 
                 // проверяем работу авто-стартера, если он включен
@@ -779,6 +816,11 @@ namespace OsEngine.OsTrader.Grids
                 {
                     return;
                 }
+
+                if(HaveOrdersTryToCancelLastSecond())
+                {
+                    return;
+                }
             }
 
             // 5 попытка смены режима если блокировано по времени или по дням
@@ -843,7 +885,9 @@ namespace OsEngine.OsTrader.Grids
 
             // 8 вход в различную логику различных сеток
 
-            if(baseRegime != TradeGridRegime.Off)
+            if(baseRegime == TradeGridRegime.On
+                || baseRegime == TradeGridRegime.CloseOnly
+                || baseRegime == TradeGridRegime.CloseForced)
             {
                 if (GridType == TradeGridPrimeType.MarketMaking)
                 {
@@ -852,6 +896,24 @@ namespace OsEngine.OsTrader.Grids
                 else if (GridType == TradeGridPrimeType.OpenPosition)
                 {
                     GridTypeOpenPositionLogic(baseRegime);
+                }
+            }
+            else if(baseRegime == TradeGridRegime.OffAndCancelOrders)
+            {
+                int countRejectOrders = TryCancelClosingOrders();
+
+                if (countRejectOrders > 0)
+                {
+                    _vacationTime = DateTime.Now.AddMilliseconds(DelayInReal * countRejectOrders);
+                    return;
+                }
+
+                countRejectOrders = TryCancelOpeningOrders();
+
+                if (countRejectOrders > 0)
+                {
+                    _vacationTime = DateTime.Now.AddMilliseconds(DelayInReal * countRejectOrders);
+                    return;
                 }
             }
         }
@@ -1052,7 +1114,7 @@ namespace OsEngine.OsTrader.Grids
                 TrySetOpenOrders();
 
                 // 3 проверяем выставлены ли закрытия
-                TrySetClosingOrders();
+                TrySetClosingOrders(Tab.PriceBestAsk);
             }
             else
             {
@@ -1083,7 +1145,7 @@ namespace OsEngine.OsTrader.Grids
                 if (baseRegime == TradeGridRegime.CloseOnly)
                 {
                     // закрываем позиции штатно
-                    TrySetClosingOrders();
+                    TrySetClosingOrders(Tab.PriceBestAsk);
                 }
                 else if (baseRegime == TradeGridRegime.CloseForced)
                 {
@@ -1388,7 +1450,7 @@ namespace OsEngine.OsTrader.Grids
             return cancelledOrders;
         }
 
-        private void TrySetClosingOrders()
+        private void TrySetClosingOrders(decimal lastPrice)
         {
             List<TradeGridLine> linesOpenPoses = GetLinesWithOpenPosition();
 
@@ -1415,6 +1477,30 @@ namespace OsEngine.OsTrader.Grids
                     && Tab.CanTradeThisVolume(volume) == false)
                 {
                     continue;
+                }
+
+                if (Tab.Security.PriceLimitHigh != 0
+                 && Tab.Security.PriceLimitLow != 0)
+                {
+                    if (line.PriceExit > Tab.Security.PriceLimitHigh
+                        || line.PriceExit < Tab.Security.PriceLimitLow)
+                    {
+                        continue;
+                    }
+                }
+
+                if (Tab.StartProgram == StartProgram.IsOsTrader
+                    && MaxDistanceToOrdersPercent != 0
+                    && lastPrice != 0)
+                {
+                    decimal maxPriceUp = lastPrice + lastPrice * (MaxDistanceToOrdersPercent / 100);
+                    decimal minPriceDown = lastPrice - lastPrice * (MaxDistanceToOrdersPercent / 100);
+
+                    if (line.PriceExit > maxPriceUp
+                     || line.PriceExit < minPriceDown)
+                    {
+                        continue;
+                    }
                 }
 
                 Tab.CloseAtLimit(pos, line.PriceExit, volume);
@@ -1826,6 +1912,48 @@ namespace OsEngine.OsTrader.Grids
             return false;
         }
 
+        public bool HaveOrdersTryToCancelLastSecond()
+        {
+            // возвращает true - если есть ордер который уже отослан на отзыв но всё ещё в статусе Active. За последние 3 секунды.
+            // если true - значит последние операции ещё не завершены по снятию ордеров
+
+            List<TradeGridLine> linesAll = GridCreator.Lines;
+
+            for (int i = 0; linesAll != null && i < linesAll.Count; i++)
+            {
+                if (linesAll[i].Position != null)
+                {
+                    Position position = linesAll[i].Position;
+
+                    if (position.OpenActive)
+                    {
+                        if (position.OpenOrders[^1].State == OrderStateType.Active 
+                            && position.OpenOrders[^1].IsSendToCancel == true)
+                        {
+                            if (position.OpenOrders[^1].LastCancelTryLocalTime.AddSeconds(3) > DateTime.Now)
+                            {
+                                return true;
+                            }
+                        }
+                    }
+
+                    if (position.CloseActive)
+                    {
+                        if (position.CloseOrders[^1].State == OrderStateType.Active
+                            && position.CloseOrders[^1].IsSendToCancel == true)
+                        {
+                            if(position.CloseOrders[^1].LastCancelTryLocalTime.AddSeconds(3) > DateTime.Now)
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
         public bool HaveCloseOrders
         {
             get
@@ -2011,6 +2139,16 @@ namespace OsEngine.OsTrader.Grids
 
             List<TradeGridLine> linesWithOrdersToOpenNeed = new List<TradeGridLine>();
 
+            decimal maxPriceUp = 0;
+            decimal minPriceDown = 0;
+
+            if(Tab.StartProgram == StartProgram.IsOsTrader
+                && MaxDistanceToOrdersPercent != 0)
+            {
+                maxPriceUp = lastPrice + lastPrice * (MaxDistanceToOrdersPercent/100);
+                minPriceDown = lastPrice - lastPrice * (MaxDistanceToOrdersPercent / 100);
+            }
+
             if (GridCreator.GridSide == Side.Buy)
             {
                 for (int i = 0; i < linesAll.Count; i++)
@@ -2030,6 +2168,16 @@ namespace OsEngine.OsTrader.Grids
                     {
                         if(curLine.PriceEnter > Tab.Security.PriceLimitHigh 
                             || curLine.PriceEnter <  Tab.Security.PriceLimitLow)
+                        {
+                            continue;
+                        }
+                    }
+
+                    if(maxPriceUp != 0 
+                        && minPriceDown != 0)
+                    {
+                        if (curLine.PriceEnter > maxPriceUp
+                         || curLine.PriceEnter < minPriceDown)
                         {
                             continue;
                         }
@@ -2065,6 +2213,16 @@ namespace OsEngine.OsTrader.Grids
                     {
                         if (curLine.PriceEnter > Tab.Security.PriceLimitHigh
                             || curLine.PriceEnter < Tab.Security.PriceLimitLow)
+                        {
+                            continue;
+                        }
+                    }
+
+                    if (maxPriceUp != 0
+                        && minPriceDown != 0)
+                    {
+                        if (curLine.PriceEnter > maxPriceUp
+                         || curLine.PriceEnter < minPriceDown)
                         {
                             continue;
                         }
@@ -2148,6 +2306,7 @@ namespace OsEngine.OsTrader.Grids
     public enum TradeGridRegime
     {
         Off,
+        OffAndCancelOrders,
         On,
         CloseOnly,
         CloseForced

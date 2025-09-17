@@ -219,6 +219,11 @@ namespace OsEngine.Market.Servers.Bybit
             get { return true; }
         }
 
+        public bool CanGetOrderLists
+        {
+            get { return true; }
+        }
+
         #endregion
 
         #region Other Permissions

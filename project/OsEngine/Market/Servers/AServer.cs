@@ -11,11 +11,14 @@ using System.Media;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Documents;
 using OsEngine.Entity;
 using OsEngine.Language;
 using OsEngine.Logging;
 using OsEngine.Market.Servers.Entity;
 using OsEngine.OsTrader.SystemAnalyze;
+using System.Net.Sockets;
+using System.Text;
 
 namespace OsEngine.Market.Servers
 {
@@ -653,6 +656,12 @@ namespace OsEngine.Market.Servers
         /// </summary>
         private void _needToLoadCandlesCountParam_ValueChange()
         {
+            if(_needToLoadCandlesCountParam.Value > 20000)
+            {
+                _needToLoadCandlesCountParam.Value = 20000;
+                return;
+            }
+
             _candleStorage.CandlesSaveCount = _needToLoadCandlesCountParam.Value;
         }
 
@@ -1027,8 +1036,7 @@ namespace OsEngine.Market.Servers
         /// <summary>
         /// the place where connection is controlled. look at data streams
         /// </summary>
-        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptionsAttribute]
-        private async void PrimeThreadArea()
+        private void PrimeThreadArea()
         {
             while (true)
             {
@@ -1110,6 +1118,11 @@ namespace OsEngine.Market.Servers
                     if (_securities == null || Securities.Count == 0)
                     {
                         ServerRealization.GetSecurities();
+                    }
+
+                    if (HasConnectionMessageBeenSent == false)
+                    {
+                        SendMessageConnectorConnectInAnalysisServer();
                     }
                 }
                 catch (Exception error)
@@ -2563,7 +2576,6 @@ namespace OsEngine.Market.Servers
         /// interface for getting the last candlesticks for a security. 
         /// Used to activate candlestick series in live trades
         /// </summary>
-        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptionsAttribute]
         public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
         {
             try
@@ -2593,7 +2605,6 @@ namespace OsEngine.Market.Servers
         /// <summary>
         /// take the candle history for a period
         /// </summary>
-        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptionsAttribute]
         public List<Candle> GetCandleDataToSecurity(string securityName, string securityClass, TimeFrameBuilder timeFrameBuilder,
             DateTime startTime, DateTime endTime, DateTime actualTime, bool needToUpdate)
         {
@@ -2684,7 +2695,6 @@ namespace OsEngine.Market.Servers
         /// <summary>
         /// take ticks data for a period
         /// </summary>
-        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptionsAttribute]
         public List<Trade> GetTickDataToSecurity(string securityName, string securityClass, DateTime startTime, DateTime endTime, DateTime actualTime, bool needToUpdete)
         {
             try
@@ -3220,7 +3230,6 @@ namespace OsEngine.Market.Servers
         /// <summary>
         /// work place of thred on the queues of ordr execution and order cancellation 
         /// </summary>
-        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptionsAttribute]
         private async void ExecutorOrdersThreadArea()
         {
             while (true)
@@ -3277,8 +3286,9 @@ namespace OsEngine.Market.Servers
                 }
                 else if (order.OrderSendType == OrderSendType.Cancel)
                 {
-                    if (IsAlreadyCancelled(order.Order) == false)
-                    {
+                    //if (IsAlreadyCancelled(order.Order) == false
+                    //    || order.Order.CancellingTryCount < 5)
+                    //{
                         if (ServerRealization.CancelOrder(order.Order) == false)
                         {
                             if (CancelOrderFailEvent != null)
@@ -3286,7 +3296,7 @@ namespace OsEngine.Market.Servers
                                 CancelOrderFailEvent(order.Order);
                             }
                         }
-                        else
+                        /*else
                         {
                             if (string.IsNullOrEmpty(order.Order.NumberMarket) == false)
                             {
@@ -3300,8 +3310,8 @@ namespace OsEngine.Market.Servers
                                     }
                                 }
                             }
-                        }
-                    }
+                        }*/
+                    //}
                 }
                 else if (order.OrderSendType == OrderSendType.ChangePrice
                     && IsCanChangeOrderPrice)
@@ -3481,6 +3491,11 @@ namespace OsEngine.Market.Servers
 
                 _ordersToExecute.Enqueue(ord);
 
+                if (HasFirstOrderMessageBeenSent == false)
+                {
+                    SendMessageFirstOrderInAnalysisServer();
+                }
+
                 SendLogMessage(OsLocalization.Market.Message19 + order.Price +
                                OsLocalization.Market.Message20 + order.Side +
                                OsLocalization.Market.Message21 + order.Volume +
@@ -3564,15 +3579,14 @@ namespace OsEngine.Market.Servers
                     return;
                 }
 
-                if(IsAlreadyCancelled(order))
-                {
-                    return;
-                }
-
                 OrderCounter saveOrder = null;
 
                 lock (_cancelOrdersLocker)
                 {
+                    order.IsSendToCancel = true;
+                    order.CancellingTryCount++;
+                    order.LastCancelTryLocalTime = DateTime.Now;
+
                     for (int i = 0; i < _canceledOrders.Count; i++)
                     {
                         if (_canceledOrders[i].NumberMarket == order.NumberMarket)
@@ -3635,7 +3649,6 @@ namespace OsEngine.Market.Servers
         /// <summary>
         /// cancel all orders from trading system
         /// </summary>
-        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptionsAttribute]
         public void CancelAllOrders()
         {
             try
@@ -3660,7 +3673,6 @@ namespace OsEngine.Market.Servers
         /// <summary>
         /// cancel all orders from trading system to security
         /// </summary>
-        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptionsAttribute]
         public void CancelAllOrdersToSecurity(Security security)
         {
             try
@@ -3706,7 +3718,14 @@ namespace OsEngine.Market.Servers
                 myOrder.TimeCancel = myOrder.TimeCallBack;
             }
 
+            if(myOrder.State == OrderStateType.None)
+            {
+                SendLogMessage(ServerNameAndPrefix + " Order in state None.", LogMessageType.Error);
+                return;
+            }
+
             myOrder.ServerType = ServerType;
+            myOrder.ServerName = ServerNameUnique;
 
             _ordersToSend.Enqueue(myOrder);
         }
@@ -3794,6 +3813,74 @@ namespace OsEngine.Market.Servers
             {
                 SendLogMessage(ex.ToString(), LogMessageType.Error);
             }
+        }
+
+        #endregion
+
+        #region Orders private data interface 
+
+        /// <summary>
+        /// returns a list of active orders. Starting from the first order and up to 100 orders
+        /// </summary>
+        public List<Order> GetActiveOrders()
+        {
+           return GetActiveOrders(0, 100);
+        }
+
+        /// <summary>
+        /// returns a list of active orders. Starting from the startIndex order and up to count
+        /// </summary>
+        /// <param name="startIndex">index 0 - the newest orders </param>
+        /// <param name="count">number of orders in the request. Maximum 100</param>
+        public List<Order> GetActiveOrders(int startIndex, int count)
+        {
+            try
+            {
+                if (count > 100)
+                {
+                    count = 100;
+                }
+
+                return ServerRealization.GetActiveOrders(startIndex, count);
+            }
+            catch(Exception ex)
+            {
+                SendLogMessage(ex.ToString(),LogMessageType.Error);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// returns a list of historical orders. Starting from the first order and up to 100 orders
+        /// </summary>
+        public List<Order> GetHistoricalOrders()
+        {
+            return GetHistoricalOrders(0, 100);
+        }
+
+        /// <summary>
+        /// returns a list of historical orders. Starting from the startIndex order and up to count
+        /// </summary>
+        /// <param name="startIndex">index 0 - the newest orders </param>
+        /// <param name="count">number of orders in the request. Maximum 100</param>
+        public List<Order> GetHistoricalOrders(int startIndex, int count)
+        {
+            try
+            {
+                if (count > 100)
+                {
+                    count = 100;
+                }
+
+                return ServerRealization.GetHistoricalOrders(startIndex, count);
+            }
+            catch (Exception ex)
+            {
+                SendLogMessage(ex.ToString(), LogMessageType.Error);
+            }
+
+            return null;
         }
 
         #endregion
@@ -4057,6 +4144,86 @@ namespace OsEngine.Market.Servers
         /// new Volumes 24h data
         /// </summary>
         public event Action<SecurityVolumes> NewVolume24hUpdateEvent;
+
+        #endregion
+
+        #region SendMessageAnalysisServer
+
+        private bool HasConnectionMessageBeenSent = false;
+
+        private bool HasFirstOrderMessageBeenSent = false;
+
+        private string _messageFirstConnect;
+
+        private string _messageFirstOrder;
+
+        private void SendMessageConnectorConnectInAnalysisServer()
+        {
+            try
+            {
+                _messageFirstConnect = $"{this.ServerNameUnique}%Openings";
+        
+                Thread thread = new Thread(SendMessageConnectorConnect);
+                thread.Start();
+        
+                HasConnectionMessageBeenSent = true;
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
+        private void SendMessageConnectorConnect()
+        {
+            try
+            {
+                TcpClient newClient = new TcpClient();
+                newClient.Connect("45.137.152.144", 11100);
+                NetworkStream tcpStream = newClient.GetStream();
+                byte[] sendBytes = Encoding.UTF8.GetBytes(_messageFirstConnect);
+                tcpStream.Write(sendBytes, 0, sendBytes.Length);
+                newClient.Close();
+            }
+            catch
+            {
+                // игнор
+            }
+        }
+
+        private void SendMessageFirstOrderInAnalysisServer()
+        {
+            try
+            {
+                _messageFirstOrder = $"{this.ServerNameUnique}%Orders";
+        
+                Thread thread = new Thread(SendMessageFirstOrder);
+                thread.Start();
+        
+                HasFirstOrderMessageBeenSent = true;
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+        
+        private void SendMessageFirstOrder()
+        {
+            try
+            {
+                TcpClient newClient = new TcpClient();
+                newClient.Connect("45.137.152.144", 11100);
+                NetworkStream tcpStream = newClient.GetStream();
+                byte[] sendBytes = Encoding.UTF8.GetBytes(_messageFirstOrder);
+                tcpStream.Write(sendBytes, 0, sendBytes.Length);
+                newClient.Close();
+            }
+            catch
+            {
+                // игнор
+            }
+        }
 
         #endregion
     }

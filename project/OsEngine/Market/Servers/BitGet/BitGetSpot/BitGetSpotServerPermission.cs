@@ -168,11 +168,6 @@ namespace OsEngine.Market.Servers.BitGet.BitGetSpot
             get { return false; }
         }
 
-        public bool IsTradeServer
-        {
-            get { return true; }
-        }
-
         public bool ManuallyClosePositionOnBoard_IsOn
         {
             get { return false; }
@@ -189,8 +184,7 @@ namespace OsEngine.Market.Servers.BitGet.BitGetSpot
             {
                 string[] values = new string[]
                 {
-                    "USDT",
-                    "USDC",
+                    "USDT"
                 };
 
                 return values;
@@ -203,6 +197,11 @@ namespace OsEngine.Market.Servers.BitGet.BitGetSpot
         }
 
         public bool CanQueryOrderStatus
+        {
+            get { return true; }
+        }
+
+        public bool CanGetOrderLists
         {
             get { return true; }
         }

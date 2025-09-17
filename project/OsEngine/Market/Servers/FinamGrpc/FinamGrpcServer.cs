@@ -1070,7 +1070,7 @@ namespace OsEngine.Market.Servers.FinamGrpc
                         for (int i = 0; i < latestTradesResponse.Trades.Count; i++)
                         {
                             FTrade newTrade = latestTradesResponse.Trades[i];
-                            if (newTrade == null) continue;
+                            if (newTrade == null || newTrade.Price == null) continue;
                             Trade trade = new Trade();
                             trade.SecurityNameCode = security.Name;
                             trade.Price = newTrade.Price.Value.ToString().ToDecimal();
@@ -1845,6 +1845,16 @@ namespace OsEngine.Market.Servers.FinamGrpc
         private RateGate _rateGateMyOrderTradeGetOrder = new RateGate(200, TimeSpan.FromMinutes(1));
 
         private RateGate _rateGateAccountTrades = new RateGate(200, TimeSpan.FromMinutes(1));
+
+        public List<Order> GetActiveOrders(int startIndex, int count)
+        {
+            return null;
+        }
+
+        public List<Order> GetHistoricalOrders(int startIndex, int count)
+        {
+            return null;
+        }
 
         #endregion
 

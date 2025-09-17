@@ -48,6 +48,7 @@ namespace OsEngine.OsTrader.Grids
             ComboBoxGridType.SelectionChanged += ComboBoxGridType_SelectionChanged;
 
             ComboBoxRegime.Items.Add(TradeGridRegime.Off.ToString());
+            ComboBoxRegime.Items.Add(TradeGridRegime.OffAndCancelOrders.ToString());
             ComboBoxRegime.Items.Add(TradeGridRegime.On.ToString());
             ComboBoxRegime.Items.Add(TradeGridRegime.CloseOnly.ToString());
             ComboBoxRegime.Items.Add(TradeGridRegime.CloseForced.ToString());
@@ -105,6 +106,9 @@ namespace OsEngine.OsTrader.Grids
             ComboBoxCheckMicroVolumes.SelectedItem = tradeGrid.CheckMicroVolumes.ToString();
             ComboBoxCheckMicroVolumes.SelectionChanged += ComboBoxCheckMicroVolumes_SelectionChanged;
 
+            TextBoxMaxDistanceToOrdersPercent.Text = tradeGrid.MaxDistanceToOrdersPercent.ToString();
+            TextBoxMaxDistanceToOrdersPercent.TextChanged += TextBoxMaxDistanceToOrdersPercent_TextChanged;
+
             // non trade periods
 
             CheckBoxNonTradePeriod1OnOff.IsChecked = tradeGrid.NonTradePeriods.NonTradePeriod1OnOff;
@@ -158,30 +162,35 @@ namespace OsEngine.OsTrader.Grids
             TextBoxNonTradePeriod5End.TextChanged += TextBoxNonTradePeriod5End_TextChanged;
 
             ComboBoxNonTradePeriod1Regime.Items.Add(TradeGridRegime.Off.ToString());
+            ComboBoxNonTradePeriod1Regime.Items.Add(TradeGridRegime.OffAndCancelOrders.ToString());
             ComboBoxNonTradePeriod1Regime.Items.Add(TradeGridRegime.CloseOnly.ToString());
             ComboBoxNonTradePeriod1Regime.Items.Add(TradeGridRegime.CloseForced.ToString());
             ComboBoxNonTradePeriod1Regime.SelectedItem = tradeGrid.NonTradePeriods.NonTradePeriod1Regime.ToString();
             ComboBoxNonTradePeriod1Regime.SelectionChanged += ComboBoxNonTradePeriod1Regime_SelectionChanged;
 
             ComboBoxNonTradePeriod2Regime.Items.Add(TradeGridRegime.Off.ToString());
+            ComboBoxNonTradePeriod2Regime.Items.Add(TradeGridRegime.OffAndCancelOrders.ToString());
             ComboBoxNonTradePeriod2Regime.Items.Add(TradeGridRegime.CloseOnly.ToString());
             ComboBoxNonTradePeriod2Regime.Items.Add(TradeGridRegime.CloseForced.ToString());
             ComboBoxNonTradePeriod2Regime.SelectedItem = tradeGrid.NonTradePeriods.NonTradePeriod2Regime.ToString();
             ComboBoxNonTradePeriod2Regime.SelectionChanged += ComboBoxNonTradePeriod2Regime_SelectionChanged;
 
             ComboBoxNonTradePeriod3Regime.Items.Add(TradeGridRegime.Off.ToString());
+            ComboBoxNonTradePeriod3Regime.Items.Add(TradeGridRegime.OffAndCancelOrders.ToString());
             ComboBoxNonTradePeriod3Regime.Items.Add(TradeGridRegime.CloseOnly.ToString());
             ComboBoxNonTradePeriod3Regime.Items.Add(TradeGridRegime.CloseForced.ToString());
             ComboBoxNonTradePeriod3Regime.SelectedItem = tradeGrid.NonTradePeriods.NonTradePeriod3Regime.ToString();
             ComboBoxNonTradePeriod3Regime.SelectionChanged += ComboBoxNonTradePeriod3Regime_SelectionChanged;
 
             ComboBoxNonTradePeriod4Regime.Items.Add(TradeGridRegime.Off.ToString());
+            ComboBoxNonTradePeriod4Regime.Items.Add(TradeGridRegime.OffAndCancelOrders.ToString());
             ComboBoxNonTradePeriod4Regime.Items.Add(TradeGridRegime.CloseOnly.ToString());
             ComboBoxNonTradePeriod4Regime.Items.Add(TradeGridRegime.CloseForced.ToString());
             ComboBoxNonTradePeriod4Regime.SelectedItem = tradeGrid.NonTradePeriods.NonTradePeriod4Regime.ToString();
             ComboBoxNonTradePeriod4Regime.SelectionChanged += ComboBoxNonTradePeriod4Regime_SelectionChanged;
 
             ComboBoxNonTradePeriod5Regime.Items.Add(TradeGridRegime.Off.ToString());
+            ComboBoxNonTradePeriod5Regime.Items.Add(TradeGridRegime.OffAndCancelOrders.ToString());
             ComboBoxNonTradePeriod5Regime.Items.Add(TradeGridRegime.CloseOnly.ToString());
             ComboBoxNonTradePeriod5Regime.Items.Add(TradeGridRegime.CloseForced.ToString());
             ComboBoxNonTradePeriod5Regime.SelectedItem = tradeGrid.NonTradePeriods.NonTradePeriod5Regime.ToString();
@@ -190,6 +199,7 @@ namespace OsEngine.OsTrader.Grids
             // trade days 
 
             ComboBoxNonTradeDaysRegime.Items.Add(TradeGridRegime.Off.ToString());
+            ComboBoxNonTradeDaysRegime.Items.Add(TradeGridRegime.OffAndCancelOrders.ToString());
             ComboBoxNonTradeDaysRegime.Items.Add(TradeGridRegime.CloseOnly.ToString());
             ComboBoxNonTradeDaysRegime.Items.Add(TradeGridRegime.CloseForced.ToString());
             ComboBoxNonTradeDaysRegime.SelectedItem = tradeGrid.NonTradeDays.NonTradeDaysRegime.ToString();
@@ -416,6 +426,13 @@ namespace OsEngine.OsTrader.Grids
             TextBoxFailCancelOrdersCountToReaction.TextChanged += TextBoxFailCancelOrdersCountToReaction_TextChanged;
             TextBoxFailCancelOrdersCountFact.Text = tradeGrid.ErrorsReaction.FailCancelOrdersCountFact.ToString();
 
+            CheckBoxWaitOnStartConnectorIsOn.IsChecked = tradeGrid.ErrorsReaction.WaitOnStartConnectorIsOn;
+            CheckBoxWaitOnStartConnectorIsOn.Checked += CheckBoxWaitOnStartConnectorIsOn_Checked;
+            CheckBoxWaitOnStartConnectorIsOn.Unchecked += CheckBoxWaitOnStartConnectorIsOn_Checked;
+
+            TextBoxWaitSecondsOnStartConnector.Text = tradeGrid.ErrorsReaction.WaitSecondsOnStartConnector.ToString();
+            TextBoxWaitSecondsOnStartConnector.TextChanged += TextBoxWaitSecondsOnStartConnector_TextChanged; 
+
             // trailing up / down
 
             CheckBoxTrailingUpIsOn.IsChecked = tradeGrid.TrailingUp.TrailingUpIsOn;
@@ -480,6 +497,7 @@ namespace OsEngine.OsTrader.Grids
             LabelMaxCloseOrdersInMarket.Content = OsLocalization.Trader.Label509;
             LabelDelayInReal.Content = OsLocalization.Trader.Label569;
             LabelCheckMicroVolumes.Content = OsLocalization.Trader.Label572;
+            LabelMaxDistanceToOrdersPercent.Content = OsLocalization.Trader.Label581;
 
             // tab controls
 
@@ -578,6 +596,9 @@ namespace OsEngine.OsTrader.Grids
             LabelFailCancelOrdersReaction.Content = OsLocalization.Trader.Label99;
             LabelFailCancelOrdersCountToReaction.Content = OsLocalization.Trader.Label542;
             LabelFailCancelOrdersCountFact.Content = OsLocalization.Trader.Label543;
+
+            CheckBoxWaitOnStartConnectorIsOn.Content = OsLocalization.Trader.Label582;
+            LabelWaitSecondsOnStartConnector.Content = OsLocalization.Trader.Label583;
 
             // trailing up
 
@@ -922,6 +943,37 @@ namespace OsEngine.OsTrader.Grids
                 }
 
                 TradeGrid.ErrorsReaction.FailCancelOrdersCountToReaction = Convert.ToInt32(TextBoxFailCancelOrdersCountToReaction.Text);
+                TradeGrid.Save();
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
+        private void CheckBoxWaitOnStartConnectorIsOn_Checked(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                TradeGrid.ErrorsReaction.WaitOnStartConnectorIsOn = CheckBoxWaitOnStartConnectorIsOn.IsChecked.Value;
+                TradeGrid.Save();
+            }
+            catch (Exception ex)
+            {
+                TradeGrid.SendNewLogMessage(ex.ToString(), Logging.LogMessageType.Error);
+            }
+        }
+
+        private void TextBoxWaitSecondsOnStartConnector_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(TextBoxWaitSecondsOnStartConnector.Text))
+                {
+                    return;
+                }
+
+                TradeGrid.ErrorsReaction.WaitSecondsOnStartConnector = Convert.ToInt32(TextBoxWaitSecondsOnStartConnector.Text);
                 TradeGrid.Save();
             }
             catch
@@ -3053,6 +3105,24 @@ namespace OsEngine.OsTrader.Grids
                 }
 
                 TradeGrid.DelayInReal = Convert.ToInt32(TextBoxDelayInReal.Text);
+                TradeGrid.Save();
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
+        private void TextBoxMaxDistanceToOrdersPercent_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(TextBoxMaxDistanceToOrdersPercent.Text))
+                {
+                    return;
+                }
+
+                TradeGrid.MaxDistanceToOrdersPercent = TextBoxMaxDistanceToOrdersPercent.Text.ToDecimal();
                 TradeGrid.Save();
             }
             catch

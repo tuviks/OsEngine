@@ -106,7 +106,7 @@ namespace OsEngine.Market.Servers.Alor
 
         public bool DataFeedTfDayCanLoad
         {
-            get { return false; }
+            get { return true; }
         }
 
         #endregion
@@ -171,6 +171,11 @@ namespace OsEngine.Market.Servers.Alor
         public bool CanQueryOrderStatus
         {
             get { return true; }
+        }
+
+        public bool CanGetOrderLists
+        {
+            get { return false; }
         }
 
         public TimeFramePermission TradeTimeFramePermission

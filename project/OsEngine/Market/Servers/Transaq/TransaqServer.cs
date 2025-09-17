@@ -227,7 +227,6 @@ namespace OsEngine.Market.Servers.Transaq
         /// Initializes the library: starts the callback queue processing thread
         /// Выполняет инициализацию библиотеки: запускает поток обработки очереди обратных вызовов
         /// </summary>
-        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptionsAttribute]
         public bool ConnectorInitialize()
         {
             try
@@ -259,7 +258,6 @@ namespace OsEngine.Market.Servers.Transaq
         /// disconnect to exchange
         /// разорвать соединение с биржей 
         /// </summary>
-        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptionsAttribute]
         public void Disconnect()
         {
             try
@@ -354,7 +352,6 @@ namespace OsEngine.Market.Servers.Transaq
         /// Shuts down the internal threads of the library, including completing thread queue callbacks
         /// Выполняет остановку внутренних потоков библиотеки, в том числе завершает поток обработки очереди обратных вызовов
         /// </summary>
-        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptionsAttribute]
         public bool ConnectorUnInitialize()
         {
             try
@@ -1784,7 +1781,7 @@ namespace OsEngine.Market.Servers.Transaq
                 board = "FUT";
             }
 
-            bool fullMarketDepthIsOn = ((ServerParameterBool)ServerParameters[18]).Value;
+            bool fullMarketDepthIsOn = ((ServerParameterBool)ServerParameters[20]).Value;
 
             string cmd = "";
 
@@ -2106,6 +2103,16 @@ namespace OsEngine.Market.Servers.Transaq
         public OrderStateType GetOrderStatus(Order order)
         {
             return OrderStateType.None;
+        }
+
+        public List<Order> GetActiveOrders(int startIndex, int count)
+        {
+            return null;
+        }
+
+        public List<Order> GetHistoricalOrders(int startIndex, int count)
+        {
+            return null;
         }
 
         #endregion

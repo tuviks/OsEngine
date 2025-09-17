@@ -170,7 +170,16 @@ namespace OsEngine.Market.Servers.Woo
 
         public string[] ManuallyClosePositionOnBoard_ValuesForTrimmingName
         {
-            get { return null; }
+            get
+            {
+                string[] values = new string[]
+                {
+                    "_LONG",
+                    "_SHORT"
+                };
+
+                return values;
+            }
         }
 
         public string[] ManuallyClosePositionOnBoard_ExceptionPositionNames
@@ -191,11 +200,6 @@ namespace OsEngine.Market.Servers.Woo
             get { return false; }
         }
 
-        public bool IsTradeServer
-        {
-            get { return true; }
-        }
-
         public bool CanQueryOrdersAfterReconnect
         {
             get { return true; }
@@ -204,6 +208,11 @@ namespace OsEngine.Market.Servers.Woo
         public bool CanQueryOrderStatus
         {
             get { return true; }
+        }
+
+        public bool CanGetOrderLists
+        {
+            get { return false; }
         }
 
         #endregion

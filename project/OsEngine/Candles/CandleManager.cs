@@ -11,10 +11,7 @@ using OsEngine.Logging;
 using OsEngine.Market;
 using OsEngine.Market.Servers;
 using OsEngine.Market.Servers.Tester;
-using OsEngine.Market.Servers.ZB;
-using OsEngine.Market.Servers.Hitbtc;
 using OsEngine.Market.Servers.InteractiveBrokers;
-using OsEngine.Market.Servers.BitMaxFutures;
 using OsEngine.Candles;
 
 namespace OsEngine.Entity
@@ -233,7 +230,6 @@ namespace OsEngine.Entity
                                  serverType == ServerType.QuikDde ||
                                  serverType == ServerType.AstsBridge ||
                                  serverType == ServerType.NinjaTrader ||
-                                 serverType == ServerType.Lmax ||
                                  serverType == ServerType.MoexFixFastSpot)
                         {
                             series.CandlesAll = null;
@@ -274,79 +270,6 @@ namespace OsEngine.Entity
                             series.UpdateAllCandles();
                             series.IsStarted = true;
                         }
-                        else if (serverType == ServerType.Exmo)
-                        {
-                            List<Trade> allTrades = _server.GetAllTradesToSecurity(series.Security);
-
-                            series.PreLoad(allTrades);
-                            series.UpdateAllCandles();
-                            series.IsStarted = true;
-                        }
-                        else if (serverType == ServerType.Zb)
-                        {
-                            ZbServer zbServer = (ZbServer)_server;
-
-                            if (series.CandleCreateMethodType != "Simple" ||
-                                series.TimeFrameSpan.TotalMinutes < 1)
-                            {
-                                List<Trade> allTrades = _server.GetAllTradesToSecurity(series.Security);
-                                series.PreLoad(allTrades);
-                            }
-                            else
-                            {
-                                List<Candle> candles = zbServer.GetCandleHistory(series.Security.Name, series.TimeFrameSpan);
-
-                                if (candles != null)
-                                {
-                                    series.CandlesAll = candles;
-                                }
-                            }
-                            series.UpdateAllCandles();
-                            series.IsStarted = true;
-                        }
-                        else if (serverType == ServerType.Hitbtc)
-                        {
-                            HitbtcServer hitbtc = (HitbtcServer)_server;
-                            if (series.CandleCreateMethodType != "Simple" ||
-                                series.TimeFrameSpan.TotalMinutes < 1)
-                            {
-                                List<Trade> allTrades = _server.GetAllTradesToSecurity(series.Security);
-                                series.PreLoad(allTrades);
-                            }
-                            else
-                            {
-                                List<Candle> candles = hitbtc.GetCandleHistory(series.Security.Name,
-                                    series.TimeFrameSpan);
-                                if (candles != null)
-                                {
-                                    series.CandlesAll = candles;
-                                }
-                            }
-                            series.UpdateAllCandles();
-                            series.IsStarted = true;
-                        }
-                        else if (serverType == ServerType.Bitmax_AscendexFutures)
-                        {
-                            if (series.CandleCreateMethodType != "Simple" ||
-                                series.TimeFrameSpan.TotalMinutes < 1)
-                            {
-                                List<Trade> allTrades = _server.GetAllTradesToSecurity(series.Security);
-                                series.PreLoad(allTrades);
-                            }
-                            else
-                            {
-                                BitMaxFuturesServer okx = (BitMaxFuturesServer)_server;
-                                List<Candle> candles = okx.GetCandleHistory(series.Security.Name,
-                                    series.TimeFrameSpan);
-                                if (candles != null)
-                                {
-                                    series.CandlesAll = candles;
-                                }
-                            }
-                            series.UpdateAllCandles();
-                            series.IsStarted = true;
-                        }
-
 
                         if (series.CandleMarketDataType == CandleMarketDataType.MarketDepth)
                         {
@@ -358,7 +281,6 @@ namespace OsEngine.Entity
                             if (_activeSeriesBasedOnTrades != null)
                                 _activeSeriesBasedOnTrades.Add(series);
                         }
-
                     }
                 }
             }

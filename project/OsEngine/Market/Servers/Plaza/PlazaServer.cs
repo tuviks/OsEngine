@@ -532,7 +532,6 @@ namespace OsEngine.Market.Servers.Plaza
         /// место работы основного потока
         /// </summary>
         /// 
-        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptionsAttribute]
         private void PrimeWorkerThreadSpace()
         {
             try
@@ -3066,6 +3065,16 @@ namespace OsEngine.Market.Servers.Plaza
         public void GetAllActivOrders()
         {
             // игнорируем. Активные заявки отправляются каждые 2 минуты через поток FORTS_USERORDERBOOK_REPL.
+        }
+
+        public List<Order> GetActiveOrders(int startIndex, int count)
+        {
+            return null;
+        }
+
+        public List<Order> GetHistoricalOrders(int startIndex, int count)
+        {
+            return null;
         }
 
         #endregion

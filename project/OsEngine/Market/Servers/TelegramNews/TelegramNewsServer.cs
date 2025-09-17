@@ -1,4 +1,4 @@
-﻿using OsEngine.Entity;
+using OsEngine.Entity;
 using OsEngine.Logging;
 using OsEngine.Market.Servers.Entity;
 using OsEngine.Market.Servers.TelegramNews.TGAuthEntity;
@@ -238,19 +238,33 @@ namespace OsEngine.Market.Servers.TelegramNews
         {
             string password = "";
 
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            try
             {
-                AuthTGPasswordDialogUi dialog = new AuthTGPasswordDialogUi();
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                {
+                    try
+                    {
+                        AuthTGPasswordDialogUi dialog = new AuthTGPasswordDialogUi();
 
-                if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.Password))
-                {
-                    password = dialog.Password;
-                }
-                else
-                {
-                    _client?.Dispose();
-                }
-            });
+                        if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.Password))
+                        {
+                            password = dialog.Password;
+                        }
+                        else
+                        {
+                            _client?.Dispose();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        ServerMaster.SendNewLogMessage($"error: {ex.Message}", LogMessageType.Error);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                ServerMaster.SendNewLogMessage($"error: {ex.Message}", LogMessageType.Error);
+            }
 
             return password;
         }
@@ -259,19 +273,33 @@ namespace OsEngine.Market.Servers.TelegramNews
         {
             string code = "";
 
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            try
             {
-                AuthTGCodeDialogUi dialog = new AuthTGCodeDialogUi();
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                {
+                    try
+                    {
+                        AuthTGCodeDialogUi dialog = new AuthTGCodeDialogUi();
 
-                if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.VerificationCode))
-                {
-                    code = dialog.VerificationCode;
-                }
-                else
-                {
-                    _client?.Dispose();
-                }
-            });
+                        if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.VerificationCode))
+                        {
+                            code = dialog.VerificationCode;
+                        }
+                        else
+                        {
+                            _client?.Dispose();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        ServerMaster.SendNewLogMessage($"error: {ex.Message}", LogMessageType.Error);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                ServerMaster.SendNewLogMessage($"error: {ex.Message}", LogMessageType.Error);
+            }
 
             return code;
         }
@@ -517,6 +545,16 @@ namespace OsEngine.Market.Servers.TelegramNews
 
         public void GetAllActivOrders()
         {
+        }
+
+        public List<Order> GetActiveOrders(int startIndex, int count)
+        {
+            return null;
+        }
+
+        public List<Order> GetHistoricalOrders(int startIndex, int count)
+        {
+            return null;
         }
 
         public List<Candle> GetCandleDataToSecurity(Security security, TimeFrameBuilder timeFrameBuilder, DateTime startTime, DateTime endTime, DateTime actualTime)

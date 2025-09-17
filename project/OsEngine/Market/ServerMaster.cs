@@ -17,10 +17,8 @@ using OsEngine.Market.Servers.Binance.Futures;
 using OsEngine.Market.Servers.Binance.Spot;
 using OsEngine.Market.Servers.Bitfinex;
 using OsEngine.Market.Servers.BitMex;
-using OsEngine.Market.Servers.ExMo;
 using OsEngine.Market.Servers.Finam;
 using OsEngine.Market.Servers.InteractiveBrokers;
-using OsEngine.Market.Servers.Lmax;
 using OsEngine.Market.Servers.NinjaTrader;
 using OsEngine.Market.Servers.Optimizer;
 using OsEngine.Market.Servers.Plaza;
@@ -28,15 +26,12 @@ using OsEngine.Market.Servers.Quik;
 using OsEngine.Market.Servers.QuikLua;
 using OsEngine.Market.Servers.Tester;
 using OsEngine.Market.Servers.Transaq;
-using OsEngine.Market.Servers.ZB;
-using OsEngine.Market.Servers.Hitbtc;
 using OsEngine.Market.Servers.MFD;
 using OsEngine.Market.Servers.MOEX;
 using OsEngine.Market.Servers.TInvest;
 using MessageBox = System.Windows.MessageBox;
 using OsEngine.Market.Servers.Bybit;
 using OsEngine.Market.Servers.OKX;
-using OsEngine.Market.Servers.BitMaxFutures;
 using OsEngine.Market.Servers.BitGet.BitGetSpot;
 using OsEngine.Market.Servers.BitGet.BitGetFutures;
 using OsEngine.Market.Servers.Alor;
@@ -86,6 +81,8 @@ using System.Linq;
 using OsEngine.Market.Servers.AscendexSpot;
 using OsEngine.Market.Servers.OKXData;
 using System.Windows.Controls;
+using OsEngine.Market.Servers.ExMo.ExmoSpot;
+using OsEngine.Market.Servers.BybitData;
 
 namespace OsEngine.Market
 {
@@ -180,7 +177,7 @@ namespace OsEngine.Market
 
         private static List<ServerType> _loadServerInstance = new List<ServerType>();
 
-        private static void TryLoadServerInstance(ServerType serverType)
+        public static void TryLoadServerInstance(ServerType serverType)
         {
             IServerPermission serverPermission = GetServerPermission(serverType);
 
@@ -211,11 +208,7 @@ namespace OsEngine.Market
                     while (reader.EndOfStream == false)
                     {
                         int currentNumber = Convert.ToInt32(reader.ReadLine());
-
-                        if (currentNumber != 0)
-                        {
-                            CreateServer(serverType, false, currentNumber);
-                        }
+                        CreateServer(serverType, false, currentNumber);
                     }
 
                     reader.Close();
@@ -301,15 +294,12 @@ namespace OsEngine.Market
                 serverTypes.Add(ServerType.BitfinexFutures);
                 serverTypes.Add(ServerType.KuCoinSpot);
                 serverTypes.Add(ServerType.KuCoinFutures);
-                serverTypes.Add(ServerType.Exmo);
-                serverTypes.Add(ServerType.Zb);
-                serverTypes.Add(ServerType.Hitbtc);
+                serverTypes.Add(ServerType.ExmoSpot);
                 serverTypes.Add(ServerType.HTXSpot);
                 serverTypes.Add(ServerType.HTXFutures);
                 serverTypes.Add(ServerType.HTXSwap);
                 serverTypes.Add(ServerType.Bybit);
                 serverTypes.Add(ServerType.OKX);
-                serverTypes.Add(ServerType.Bitmax_AscendexFutures);
                 serverTypes.Add(ServerType.BitGetSpot);
                 serverTypes.Add(ServerType.BitGetFutures);
                 serverTypes.Add(ServerType.BingXSpot);
@@ -317,7 +307,6 @@ namespace OsEngine.Market
                 serverTypes.Add(ServerType.XTSpot);
                 serverTypes.Add(ServerType.PionexSpot);
                 serverTypes.Add(ServerType.Woo);
-                serverTypes.Add(ServerType.Lmax);
                 serverTypes.Add(ServerType.BitMartSpot);
                 serverTypes.Add(ServerType.BitMartFutures);
                 serverTypes.Add(ServerType.MoexFixFastCurrency);
@@ -421,7 +410,7 @@ namespace OsEngine.Market
                 serverTypes.Add(ServerType.BitMex);
                 serverTypes.Add(ServerType.BitfinexSpot);
                 serverTypes.Add(ServerType.BitfinexFutures);
-                serverTypes.Add(ServerType.Exmo);
+                serverTypes.Add(ServerType.ExmoSpot);
                 serverTypes.Add(ServerType.HTXFutures);
                 serverTypes.Add(ServerType.HTXSwap);
                 serverTypes.Add(ServerType.Bybit);
@@ -438,6 +427,7 @@ namespace OsEngine.Market
                 serverTypes.Add(ServerType.BinanceData);
                 serverTypes.Add(ServerType.AscendexSpot);
                 serverTypes.Add(ServerType.OKXData);
+                serverTypes.Add(ServerType.BybitData);
 
                 return serverTypes;
             }
@@ -545,6 +535,8 @@ namespace OsEngine.Market
                     _servers = new List<IServer>();
                 }
 
+                TryLoadServerInstance(type);
+
                 for (int i = 0; i < _servers.Count; i++)
                 {
                     if (_servers[i].GetType().BaseType.Name.ToString() == "AServer")
@@ -568,6 +560,10 @@ namespace OsEngine.Market
 
                 IServer newServer = null;
 
+                if (type == ServerType.BybitData)
+                {
+                    newServer = new BybitDataServer();
+                }
                 if (type == ServerType.OKXData)
                 {
                     newServer = new OKXDataServer();
@@ -644,10 +640,6 @@ namespace OsEngine.Market
                 {
                     newServer = new BitGetServerSpot(uniqueNum);
                 }
-                if (type == ServerType.Bitmax_AscendexFutures)
-                {
-                    newServer = new BitMaxFuturesServer();
-                }
                 if (type == ServerType.OKX)
                 {
                     newServer = new OkxServer(uniqueNum);
@@ -664,10 +656,6 @@ namespace OsEngine.Market
                 {
                     newServer = new TInvestServer(uniqueNum);
                 }
-                if (type == ServerType.Hitbtc)
-                {
-                    newServer = new HitbtcServer();
-                }
                 if (type == ServerType.GateIoSpot)
                 {
                     newServer = new GateIoServerSpot(uniqueNum);
@@ -680,21 +668,13 @@ namespace OsEngine.Market
                 {
                     newServer = new BybitServer(uniqueNum);
                 }
-                if (type == ServerType.Zb)
+                if (type == ServerType.ExmoSpot)
                 {
-                    newServer = new ZbServer();
-                }
-                if (type == ServerType.Exmo)
-                {
-                    newServer = new ExmoServer();
+                    newServer = new ExmoSpotServer();
                 }
                 if (type == ServerType.Transaq)
                 {
                     newServer = new TransaqServer();
-                }
-                if (type == ServerType.Lmax)
-                {
-                    newServer = new LmaxServer();
                 }
                 if (type == ServerType.BitfinexSpot)
                 {
@@ -830,12 +810,17 @@ namespace OsEngine.Market
 
                 if (ServerCreateEvent != null)
                 {
-                    ServerCreateEvent(newServer);
+                    try
+                    {
+                        ServerCreateEvent(newServer);
+                    }
+                    catch (Exception ex)
+                    {
+                        SendNewLogMessage(ex.ToString(), LogMessageType.Error);
+                    }
                 }
 
-                SendNewLogMessage(OsLocalization.Market.Message3 + _servers[_servers.Count - 1].ServerType, LogMessageType.System);
-
-                TryLoadServerInstance(type);
+                SendNewLogMessage(OsLocalization.Market.Message3 + _servers[_servers.Count - 1].ServerNameAndPrefix, LogMessageType.System);
             }
             catch (Exception error)
             {
@@ -864,14 +849,24 @@ namespace OsEngine.Market
                     if (serverCurrent.ServerType == type
                         && serverCurrent.ServerNum == uniqueNum)
                     {
+                        serverCurrent.StopServer();
                         serverCurrent.Delete();
 
                         _servers.RemoveAt(i);
 
                         if (ServerDeleteEvent != null)
                         {
-                            ServerDeleteEvent();
+                            try
+                            {
+                                ServerDeleteEvent(serverCurrent);
+                            }
+                            catch(Exception ex)
+                            {
+                                SendNewLogMessage(ex.ToString(), LogMessageType.Error);
+                            }
                         }
+
+                        SendNewLogMessage(OsLocalization.Market.Label245 + ": " + serverCurrent.ServerNameAndPrefix ,LogMessageType.System);
 
                         return;
                     }
@@ -1093,7 +1088,7 @@ namespace OsEngine.Market
         /// <summary>
         /// server deleted
         /// </summary>
-        public static event Action ServerDeleteEvent;
+        public static event Action<IServer> ServerDeleteEvent;
 
         #endregion
 
@@ -1573,6 +1568,14 @@ namespace OsEngine.Market
                 {
                     serverPermission = new OKXDataServerPermission();
                 }
+                else if (type == ServerType.ExmoSpot)
+                {
+                    serverPermission = new ExmoSpotServerPermission();
+                }
+                else if (type == ServerType.BybitData)
+                {
+                    serverPermission = new BybitDataServerPermission();
+                }
 
                 if (serverPermission != null)
                 {
@@ -2026,12 +2029,6 @@ namespace OsEngine.Market
         TInvest,
 
         /// <summary>
-        /// cryptocurrency exchange Hitbtc
-        /// биржа криптовалют Hitbtc
-        /// </summary>
-        Hitbtc,
-
-        /// <summary>
         /// cryptocurrency exchange Gate.io
         /// биржа криптовалют Gate.io
         /// </summary>
@@ -2044,22 +2041,10 @@ namespace OsEngine.Market
         GateIoFutures,
 
         /// <summary>
-        /// cryptocurrency exchange ZB
-        /// биржа криптовалют ZB
-        /// </summary>
-        Zb,
-
-        /// <summary>
         /// transaq
         /// транзак
         /// </summary>
         Transaq,
-
-        /// <summary>
-        /// LMax exchange
-        /// биржа LMax
-        /// </summary>
-        Lmax,
 
         /// <summary>
         /// cryptocurrency exchange BitfinexSpot
@@ -2089,7 +2074,7 @@ namespace OsEngine.Market
         /// cryptocurrency exchange Exmo
         /// биржа криптовалют Exmo
         /// </summary>
-        Exmo,
+        ExmoSpot,
 
         /// <summary>
         /// terminal Ninja Trader
@@ -2181,11 +2166,6 @@ namespace OsEngine.Market
         /// OKX exchange
         /// </summary>
         OKX,
-
-        /// <summary>
-        /// Ascendex exchange
-        /// </summary>
-        Bitmax_AscendexFutures,
 
         /// <summary>
         /// BitGetSpot exchange
@@ -2371,6 +2351,12 @@ namespace OsEngine.Market
         /// downloading historical data from exchange OKX
         /// скачивание исторических данных с биржи OKX
         /// </summary>
-        OKXData
+        OKXData,
+
+        /// <summary>
+        /// downloading historical data from exchange Bybit
+        /// скачивание исторических данных с биржи Bybit
+        /// </summary>
+        BybitData
     }
 }
