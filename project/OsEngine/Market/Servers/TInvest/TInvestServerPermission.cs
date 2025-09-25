@@ -250,7 +250,7 @@ namespace OsEngine.Market.Servers.TInvest
 
         public int AsyncOrderSending_RateGateLimitMls
         {
-            get { return 100; }
+            get { return 75; }
         }
 
         public bool IsSupports_AsyncCandlesStarter
@@ -261,6 +261,11 @@ namespace OsEngine.Market.Servers.TInvest
         public int AsyncCandlesStarter_RateGateLimitMls
         {
             get { return 10; }
+        }
+
+        public string[] IpAddresServer
+        {
+            get { return null; }
         }
 
         #endregion

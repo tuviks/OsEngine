@@ -785,7 +785,7 @@ namespace OsEngine.Market.Servers.Transaq
                         {
                             pointCost = securityData.Point_cost.ToDecimal();
                         }
-                        catch (Exception e)
+                        catch
                         {
                             decimal.TryParse(securityData.Point_cost, NumberStyles.Float, CultureInfo.InvariantCulture, out pointCost);
                         }
@@ -1526,7 +1526,7 @@ namespace OsEngine.Market.Servers.Transaq
 
                 return osCandles;
             }
-            catch (Exception e)
+            catch
             {
                 return null;
             }
@@ -1865,7 +1865,6 @@ namespace OsEngine.Market.Servers.Transaq
 
         #region 8 Trade
 
-        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptionsAttribute]
         public void SendOrder(Order order)
         {
             try
@@ -1986,7 +1985,6 @@ namespace OsEngine.Market.Servers.Transaq
 
         private string _sendOrdersLocker = "sendOrdersLocker";
 
-        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptionsAttribute]
         public bool CancelOrder(Order order)
         {
             try
@@ -2126,7 +2124,6 @@ namespace OsEngine.Market.Servers.Transaq
         /// обработчик данных пришедших через каллбек
         /// </summary>
         /// <param name="pData">data from Transaq / данные, поступившие от транзака</param>
-        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptionsAttribute]
         private bool CallBackDataHandler(IntPtr pData)
         {
             try
@@ -2149,7 +2146,6 @@ namespace OsEngine.Market.Servers.Transaq
         /// takes messages from the shared queue, converts them to C# classes, and sends them to up
         /// берет сообщения из общей очереди, конвертирует их в классы C# и отправляет на верх
         /// </summary>
-        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptionsAttribute]
         private void Converter()
         {
             while (true)
@@ -3195,7 +3191,7 @@ namespace OsEngine.Market.Servers.Transaq
 
         public event Action<Trade> NewTradesEvent;
 
-        public event Action<OptionMarketDataForConnector> AdditionalMarketDataEvent;
+        public event Action<OptionMarketDataForConnector> AdditionalMarketDataEvent { add { } remove { } }
 
         #endregion
 
@@ -3211,9 +3207,9 @@ namespace OsEngine.Market.Servers.Transaq
 
         public event Action<string, LogMessageType> LogMessageEvent;
 
-        public event Action<Funding> FundingUpdateEvent;
+        public event Action<Funding> FundingUpdateEvent { add { } remove { } }
 
-        public event Action<SecurityVolumes> Volume24hUpdateEvent;
+        public event Action<SecurityVolumes> Volume24hUpdateEvent { add { } remove { } }
 
         #endregion
 
@@ -3227,7 +3223,6 @@ namespace OsEngine.Market.Servers.Transaq
         /// </summary>
         /// <param name="command">command as a XML document / команда в виде XML документа</param>
         /// <returns>result of sending command/результат отправки команды</returns>
-        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptionsAttribute]
         public string ConnectorSendCommand(string command)
         {
             try
@@ -3245,7 +3240,7 @@ namespace OsEngine.Market.Servers.Transaq
                     return result;
                 }
             }
-            catch (AccessViolationException e)
+            catch (AccessViolationException)
             {
                 // no message
                 return null;

@@ -67,10 +67,12 @@ namespace OsEngine.OsTrader.Grids
                 worker.Start();
 
                 RegimeLogicEntry = TradeGridLogicEntryRegime.OncePerSecond;
+                AutoClearJournalIsOn = true;
             }
             else
             {
                 RegimeLogicEntry = TradeGridLogicEntryRegime.OnTrade;
+                AutoClearJournalIsOn = false;
             }
         }
 
@@ -167,7 +169,7 @@ namespace OsEngine.OsTrader.Grids
                 
                 Number = Convert.ToInt32(values[0]);
                 Enum.TryParse(values[1], out GridType);
-                Enum.TryParse(values[2], out Regime);
+                Enum.TryParse(values[2], out _regime);
                 Enum.TryParse(values[3], out RegimeLogicEntry);
                 AutoClearJournalIsOn = Convert.ToBoolean(values[4]);
                 MaxClosePositionsInJournal = Convert.ToInt32(values[5]);
@@ -345,11 +347,37 @@ namespace OsEngine.OsTrader.Grids
 
         public TradeGridPrimeType GridType;
 
-        public TradeGridRegime Regime;
+        public TradeGridRegime Regime
+        {
+            get
+            {
+                return _regime;
+            }
+            set
+            {
+                if(_regime == value)
+                {
+                    return;
+                }
+
+                _regime = value;
+
+                if(FullRePaintGridEvent != null)
+                {
+                    FullRePaintGridEvent();
+                }
+                
+                if(RePaintSettingsEvent != null)
+                {
+                    RePaintSettingsEvent();
+                }
+            }
+        }
+        private TradeGridRegime _regime;
 
         public TradeGridLogicEntryRegime RegimeLogicEntry;
 
-        public bool AutoClearJournalIsOn = true;
+        public bool AutoClearJournalIsOn;
 
         public int MaxClosePositionsInJournal = 100;
 
@@ -361,7 +389,7 @@ namespace OsEngine.OsTrader.Grids
 
         public bool CheckMicroVolumes = true;
 
-        public decimal MaxDistanceToOrdersPercent = 0.3m;
+        public decimal MaxDistanceToOrdersPercent = 0;
 
         #endregion
 
@@ -393,14 +421,6 @@ namespace OsEngine.OsTrader.Grids
                 {
                     // По сетке не подключены данные. Запрет
                     CustomMessageBoxUi ui = new CustomMessageBoxUi(OsLocalization.Trader.Label512);
-                    ui.Show();
-                    return;
-                }
-
-                if(GridCreator.FirstPrice <= 0)
-                {
-                    // Первая цена не установлена. Запрет
-                    CustomMessageBoxUi ui = new CustomMessageBoxUi(OsLocalization.Trader.Label513);
                     ui.Show();
                     return;
                 }

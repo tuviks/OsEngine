@@ -479,8 +479,7 @@ namespace OsEngine.Market.Connectors
             get
             {
                 if (ServerType == ServerType.Tester ||
-                     ServerType == ServerType.Optimizer ||
-                    ServerType == ServerType.BitMex)
+                     ServerType == ServerType.Optimizer)
                 {
                     return true;
                 }
@@ -521,6 +520,46 @@ namespace OsEngine.Market.Connectors
                 }
 
                 return serverPermision.IsCanChangeOrderPrice;
+            }
+        }
+
+        public MarketDepthLoadRegime MarketDepthPaintRegime
+        {
+            get
+            {
+                if (ServerType == ServerType.Tester ||
+                    ServerType == ServerType.Optimizer)
+                {
+                    return MarketDepthLoadRegime.Unknown;
+                }
+                else
+                {
+                    IServer server = _myServer;
+
+                    if(server == null)
+                    {
+                        return MarketDepthLoadRegime.All;
+                    }
+
+                    if(server.GetType().BaseType.Name == "AServer")
+                    {
+                        AServer Aserver = (AServer)server;
+
+                        if(Aserver._needToUseFullMarketDepth.Value == true)
+                        {
+                            return MarketDepthLoadRegime.All;
+                        }
+                        else
+                        {
+                            return MarketDepthLoadRegime.BidAsk;
+                        }
+
+                    }
+                    else
+                    {
+                        return MarketDepthLoadRegime.All;
+                    }
+                }
             }
         }
 
@@ -1514,6 +1553,8 @@ namespace OsEngine.Market.Connectors
                 _optionMarketData.Rho = data.Rho;
                 _optionMarketData.OpenInterest = data.OpenInterest;
                 _optionMarketData.TimeCreate = data.TimeCreate;
+
+                AdditionalDataEvent?.Invoke(_optionMarketData);
             }
             catch (Exception error)
             {
@@ -2022,6 +2063,11 @@ namespace OsEngine.Market.Connectors
         /// myTrade are changed
         /// </summary>
         public event Action<MyTrade> MyTradeEvent;
+
+        /// <summary>
+        /// new additional market data event
+        /// </summary>
+        public event Action<OptionMarketData> AdditionalDataEvent;
 
         /// <summary>
         /// new trade in the trades feed
