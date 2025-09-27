@@ -114,7 +114,7 @@ namespace OsEngine.Market.Servers.HTX.Swap
 
         public bool MarketOrdersIsSupport
         {
-            get { return false; }
+            get { return true; }
         }
 
         public int WaitTimeSecondsAfterFirstStartToSendOrders
@@ -273,7 +273,15 @@ namespace OsEngine.Market.Servers.HTX.Swap
 
         public string[] IpAddresServer
         {
-            get { return null; }
+            get
+            {
+                string[] pingIpDomens = new string[]
+                {
+                    "api.hbdm.com"
+                };
+
+                return pingIpDomens;
+            }
         }
 
         #endregion

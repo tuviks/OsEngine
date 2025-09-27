@@ -60,14 +60,6 @@ namespace OsEngine.OsTrader.ClientManagement
         }
         private string _name;
 
-        public string Status
-        {
-            get
-            {
-                return "Unknown";
-            }
-        }
-
         public TradeClientRegime Regime;
 
         public void Save()
@@ -139,6 +131,26 @@ namespace OsEngine.OsTrader.ClientManagement
         {
             try
             {
+                if(RobotsSettings.Count > 0)
+                {
+                    TradeClientRobot[] robots = RobotsSettings.ToArray();
+
+                    for (int i = 0; i < robots.Length; i++)
+                    {
+                        RemoveRobotAtNumber(robots[i].Number);
+                    }
+                }
+
+                if(ConnectorsSettings.Count > 0)
+                {
+                    TradeClientConnector[] connectors = ConnectorsSettings.ToArray();
+
+                    for (int i = 0; i < connectors.Length; i++)
+                    {
+                        RemoveConnectorAtNumber(connectors[i].Number);
+                    }
+                }
+
                 if (File.Exists(@"Engine\ClientManagement\" + Number + @"TradeClient.txt") == true)
                 {
                     File.Delete(@"Engine\ClientManagement\" + Number + @"TradeClient.txt");
@@ -266,7 +278,7 @@ namespace OsEngine.OsTrader.ClientManagement
 
                 if (i + 1 != RobotsSettings.Count)
                 {
-                    saveStr += "#";
+                    saveStr += "*";
                 }
             }
 
@@ -275,7 +287,12 @@ namespace OsEngine.OsTrader.ClientManagement
 
         private void LoadRobotsFromString(string saveStr)
         {
-            string[] robots = saveStr.Split('#');
+            if(saveStr == null)
+            {
+                return;
+            }
+
+            string[] robots = saveStr.Split('*');
 
             for (int i = 0; i < robots.Length; i++)
             {
@@ -344,6 +361,18 @@ namespace OsEngine.OsTrader.ClientManagement
             }
 
             Save();
+        }
+
+        public void UpdateInfo()
+        {
+            if(RobotsSettings.Count == 0)
+            {
+                return;
+            }
+            if(NewRobotEvent != null)
+            {
+                NewRobotEvent(RobotsSettings[0]);
+            }
         }
 
         public event Action<TradeClientRobot> NewRobotEvent;

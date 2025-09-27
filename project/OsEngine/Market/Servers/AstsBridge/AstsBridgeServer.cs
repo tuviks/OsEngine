@@ -816,9 +816,9 @@ namespace OsEngine.Market.Servers.AstsBridge
 
                         if (_bidAskToSend.TryDequeue(out bidAsk))
                         {
-                            if (NewBidAscIncomeEvent != null)
+                            if (NewBidAskIncomeEvent != null)
                             {
-                                NewBidAscIncomeEvent(bidAsk.Bid, bidAsk.Ask, bidAsk.Security);
+                                NewBidAskIncomeEvent(bidAsk.Bid, bidAsk.Ask, bidAsk.Security);
                             }
                         }
                     }
@@ -1271,8 +1271,8 @@ namespace OsEngine.Market.Servers.AstsBridge
 
             _bidAskToSend.Enqueue(new BidAskSender
             {
-                Bid = myDepth.Asks[0].Price,
-                Ask = myDepth.Bids[0].Price,
+                Bid = myDepth.Asks[0].Price.ToDecimal(),
+                Ask = myDepth.Bids[0].Price.ToDecimal(),
                 Security = GetSecurityForName(myDepth.SecurityNameCode, "")
             });
         }
@@ -1281,7 +1281,7 @@ namespace OsEngine.Market.Servers.AstsBridge
         /// called when bid or ask changes
         /// вызывается когда изменяется бид или аск по инструменту
         /// </summary>
-        public event Action<decimal, decimal, Security> NewBidAscIncomeEvent;
+        public event Action<decimal, decimal, Security> NewBidAskIncomeEvent;
 
         /// <summary>
         /// called when depth changes

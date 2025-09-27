@@ -2404,8 +2404,8 @@ namespace OsEngine.Market.Servers.BitGet.BitGetFutures
 
                 for (int i = 0; i < responseDepth.data[0].asks.Count; i++)
                 {
-                    decimal ask = responseDepth.data[0].asks[i][1].ToString().ToDecimal();
-                    decimal price = responseDepth.data[0].asks[i][0].ToString().ToDecimal();
+                    double ask = responseDepth.data[0].asks[i][1].ToString().ToDouble();
+                    double price = responseDepth.data[0].asks[i][0].ToString().ToDouble();
 
                     if (ask == 0 ||
                         price == 0)
@@ -2421,8 +2421,8 @@ namespace OsEngine.Market.Servers.BitGet.BitGetFutures
 
                 for (int i = 0; i < responseDepth.data[0].bids.Count; i++)
                 {
-                    decimal bid = responseDepth.data[0].bids[i][1].ToString().ToDecimal();
-                    decimal price = responseDepth.data[0].bids[i][0].ToString().ToDecimal();
+                    double bid = responseDepth.data[0].bids[i][1].ToString().ToDouble();
+                    double price = responseDepth.data[0].bids[i][0].ToString().ToDouble();
 
                     if (bid == 0 ||
                         price == 0)
@@ -3420,8 +3420,10 @@ namespace OsEngine.Market.Servers.BitGet.BitGetFutures
                     else
                     {
                         if (responseMessage.Content.Contains("\"sign signature error\"")
-                            || (responseMessage.Content.Contains("\"Apikey does not exist\""))
-                            || (responseMessage.Content.Contains("\"apikey/password is incorrect\"")))
+                            || responseMessage.Content.Contains("\"Apikey does not exist\"")
+                            || responseMessage.Content.Contains("\"apikey/password is incorrect\"")
+                            || responseMessage.Content.Contains("\"Request timestamp expired\"")
+                            || responseMessage.Content == "")
                         {
                             Disconnect();
                         }

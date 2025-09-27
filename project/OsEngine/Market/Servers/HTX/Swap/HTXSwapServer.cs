@@ -424,7 +424,7 @@ namespace OsEngine.Market.Servers.HTX.Swap
 
         private void ThreadUpdatePortfolio()
         {
-            Thread.Sleep(15000);
+            Thread.Sleep(30000);
 
             while (true)
             {
@@ -2058,8 +2058,8 @@ namespace OsEngine.Market.Servers.HTX.Swap
                             continue;
                         }
 
-                        decimal ask = item.asks[i][1].ToString().ToDecimal();
-                        decimal price = item.asks[i][0].ToString().ToDecimal();
+                        double ask = item.asks[i][1].ToString().ToDouble();
+                        double price = item.asks[i][0].ToString().ToDouble();
 
                         if (ask == 0 ||
                             price == 0)
@@ -2083,8 +2083,8 @@ namespace OsEngine.Market.Servers.HTX.Swap
                             continue;
                         }
 
-                        decimal bid = item.bids[i][1].ToString().ToDecimal();
-                        decimal price = item.bids[i][0].ToString().ToDecimal();
+                        double bid = item.bids[i][1].ToString().ToDouble();
+                        double price = item.bids[i][0].ToString().ToDouble();
 
                         if (bid == 0 ||
                             price == 0)
@@ -2538,7 +2538,15 @@ namespace OsEngine.Market.Servers.HTX.Swap
                 }
                 else if (order.TypeOrder == OrderPriceType.Market)
                 {
-                    jsonContent.Add("order_price_type", "market");
+                    if ("COIN".Equals(((ServerParameterEnum)ServerParameters[2]).Value))
+                    {
+                        jsonContent.Add("order_price_type", "limit");
+                        jsonContent.Add("price", order.Price.ToString().Replace(",", "."));
+                    }
+                    else
+                    {
+                        jsonContent.Add("order_price_type", "market");
+                    }
                 }
 
                 jsonContent.Add("channel_code", "AAe2ccbd47");
