@@ -18,6 +18,7 @@ using System.Text;
 using System.Threading;
 using OsEngine.Entity.WebSocketOsEngine;
 using RestSharp;
+using OsEngine.Market.Servers.XT.XTFutures.Entity;
 
 namespace OsEngine.Market.Servers.XT.XTSpot
 {
@@ -1414,7 +1415,7 @@ namespace OsEngine.Market.Servers.XT.XTSpot
                 }
                 catch (Exception exception)
                 {
-                    SendLogMessage("SnapshotDepth error: " + exception.ToString(), LogMessageType.Error);
+                    SendLogMessage("UpdateTrade error: " + exception.ToString(), LogMessageType.Error);
                 }
             }
 
@@ -2296,7 +2297,7 @@ namespace OsEngine.Market.Servers.XT.XTSpot
                     {
                         CreateQueryMyTrade(myOrder.SecurityNameCode, myOrder.NumberMarket, 1);
                     }
-
+                    
                     return myOrder.State;
                 }
                 catch (Exception exception)

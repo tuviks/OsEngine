@@ -6,6 +6,8 @@
 using OsEngine.Entity;
 using OsEngine.Language;
 using OsEngine.Logging;
+using OsEngine.Market;
+using OsEngine.Market.Servers;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -168,13 +170,21 @@ namespace OsEngine.OsTrader.Panels.Tab.Internal
                     Enum.TryParse(reader.ReadLine(), out TypeDoubleExitOrder);
                     Enum.TryParse(reader.ReadLine(), out ValuesType);
                     Enum.TryParse(reader.ReadLine(), out OrderTypeTime);
-                    
-                    reader.Close();
+
+                    try
+                    {
+                        LimitsMakerOnly = Convert.ToBoolean(reader.ReadLine());
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+
                 }
             }
-            catch (Exception)
+            catch (Exception error)
             {
-                // ignore
+                SendNewLogMessage(error.ToString(), LogMessageType.Error);
             }
             return true;
         }
@@ -191,7 +201,16 @@ namespace OsEngine.OsTrader.Panels.Tab.Internal
 
             try
             {
-                using (StreamWriter writer = new StreamWriter(@"Engine\" + _name + @"StrategSettings.txt", false))
+                string path = @"Engine\" + _name + @"StrategSettings.txt";
+
+                string dir = Path.GetDirectoryName(path);
+
+                if(Directory.Exists(dir) == false)
+                {
+                    Directory.CreateDirectory(dir);
+                }
+
+                using (StreamWriter writer = new StreamWriter(path, false))
                 {
                     CultureInfo myCultureInfo = new CultureInfo("ru-RU");
                     writer.WriteLine(StopIsOn);
@@ -216,12 +235,12 @@ namespace OsEngine.OsTrader.Panels.Tab.Internal
                     writer.WriteLine(TypeDoubleExitOrder);
                     writer.WriteLine(ValuesType);
                     writer.WriteLine(OrderTypeTime);
-                    writer.Close();
+                    writer.WriteLine(LimitsMakerOnly);
                 }
             }
-            catch (Exception)
+            catch (Exception error)
             {
-                // ignore
+                SendNewLogMessage(error.ToString(), LogMessageType.Error);
             }
         }
 
@@ -234,7 +253,15 @@ namespace OsEngine.OsTrader.Panels.Tab.Internal
             {
                 if (File.Exists(@"Engine\" + _name + @"StrategSettings.txt"))
                 {
-                    File.Delete(@"Engine\" + _name + @"StrategSettings.txt");
+                    string path = @"Engine\" + _name + @"StrategSettings.txt";
+
+                    FileInfo file = new FileInfo(path);
+                    if(file.IsReadOnly)
+                    {
+                        file.IsReadOnly = false;
+                    }
+
+                    File.Delete(path);
                 }
 
                 if(TabsToCheck != null)
@@ -268,7 +295,16 @@ namespace OsEngine.OsTrader.Panels.Tab.Internal
         /// </summary>
         public void ShowDialog(StartProgram startProgram)
         {
-            BotManualControlUi ui = new BotManualControlUi(this, startProgram);
+            IServer server = _botTab.Connector.MyServer;
+
+            IServerPermission serverPermission = null;
+
+            if(server != null)
+            {
+                serverPermission = ServerMaster.GetServerPermission(server.ServerType);
+            }
+
+            BotManualControlUi ui = new BotManualControlUi(this, startProgram, serverPermission);
             ui.ShowDialog();
         }
 
@@ -459,6 +495,8 @@ namespace OsEngine.OsTrader.Panels.Tab.Internal
         /// Order lifetime type
         /// </summary>
         public OrderTypeTime OrderTypeTime;
+
+        public bool LimitsMakerOnly = false;
 
         /// <summary>
         /// Journal

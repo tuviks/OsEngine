@@ -7,7 +7,9 @@ using System;
 using System.IO;
 using System.Media;
 using System.Windows.Forms;
+using OsEngine.Entity;
 using OsEngine.Language;
+using OsEngine.Market;
 
 namespace OsEngine.Alerts
 {
@@ -73,6 +75,8 @@ namespace OsEngine.Alerts
         {
             _ui.Closed -= _ui_Closed;
             _ui = null;
+
+            DeleteGrid();
         }
 
         /// <summary>
@@ -146,6 +150,33 @@ namespace OsEngine.Alerts
             _grid.Columns.Add(column1);
 
             _grid.Rows.Add(null, null);
+            _grid.DataError += _grid_DataError;
+        }
+
+        private static void _grid_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        {
+            ServerMaster.SendNewLogMessage(e.ToString(), Logging.LogMessageType.Error);
+        }
+
+        private static void DeleteGrid()
+        {
+            if (_grid != null)
+            {
+                try
+                {
+                    DataGridFactory.ClearLinks(_grid);
+                    _grid.DataError -= _grid_DataError;
+                    _grid.Rows.Clear();
+                    _grid.Columns.Clear();
+                    _grid.DataSource = null;
+                    _grid.Dispose();
+                    _grid = null;
+                }
+                catch
+                {
+
+                }
+            }
         }
 
         /// <summary>

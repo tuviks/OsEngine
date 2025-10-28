@@ -116,6 +116,16 @@ namespace OsEngine.Market.Servers
                 _gridServerParameters = null;
             }
 
+            if (_gridConnections != null)
+            {
+                _gridConnections.CellClick -= _gridConnections_CellClick;
+                _gridConnections.CellEndEdit -= _gridConnections_CellEndEdit;
+                _gridConnections.DataError -= _gridConnections_DataError;
+                _gridConnections.Columns.Clear();
+                DataGridFactory.ClearLinks(_gridConnections);
+                _gridConnections = null;
+            }
+
             HostPreConfiguredConnections.Child = null;
             HostSettings.Child = null;
         }
@@ -223,6 +233,12 @@ namespace OsEngine.Market.Servers
 
             _gridConnections.CellClick += _gridConnections_CellClick;
             _gridConnections.CellEndEdit += _gridConnections_CellEndEdit;
+            _gridConnections.DataError += _gridConnections_DataError;
+        }
+
+        private void _gridConnections_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        {
+            ServerMaster.SendNewLogMessage(e.ToString(), Logging.LogMessageType.Error);
         }
 
         private void _gridConnections_CellEndEdit(object sender, DataGridViewCellEventArgs e)
@@ -282,7 +298,7 @@ namespace OsEngine.Market.Servers
                     UpdateServersCount();
                     PaintGridConnectionsInstance();
                     ChangeActiveServer(row);
-                    ServerMaster.TrySaveServerInstance(_serversArray);
+                    ServerMaster.SaveServerInstanceByType(_server.ServerType);
                 }
                 else if (column == 6
                     && row != 0)
@@ -295,7 +311,6 @@ namespace OsEngine.Market.Servers
                     UpdateServersCount();
                     PaintGridConnectionsInstance();
                     ChangeActiveServer(0);
-                    ServerMaster.TrySaveServerInstance(_serversArray);
                 }
                 else if (column == 5
                     && row < _gridConnections.Rows.Count - 1)
@@ -335,7 +350,7 @@ namespace OsEngine.Market.Servers
                 {
                     ServerMaster.DeleteServer(server.ServerType, server.ServerNum);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     ServerMaster.SendNewLogMessage(ex.Message, Logging.LogMessageType.Error);
                 }

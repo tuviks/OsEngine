@@ -15,10 +15,12 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
+
 
 namespace OsEngine.Market.Servers.OKX
 {
@@ -63,15 +65,6 @@ namespace OsEngine.Market.Servers.OKX
             thread.Name = "CheckAliveWebSocket";
             thread.Start();
         }
-
-        public ServerType ServerType
-        {
-            get { return ServerType.OKX; }
-        }
-
-        public ServerConnectStatus ServerStatus { get; set; }
-
-        public DateTime ServerTime { get; set; }
 
         private WebProxy _myProxy;
 
@@ -152,8 +145,6 @@ namespace OsEngine.Market.Servers.OKX
             {
                 CreatePublicWebSocketConnect();
                 CreatePrivateWebSocketConnect();
-                //CheckSocketsActivate();
-                //SetPositionMode();
             }
             catch (Exception exception)
             {
@@ -191,6 +182,15 @@ namespace OsEngine.Market.Servers.OKX
                 DisconnectEvent();
             }
         }
+
+        public ServerType ServerType
+        {
+            get { return ServerType.OKX; }
+        }
+
+        public ServerConnectStatus ServerStatus { get; set; }
+
+        public DateTime ServerTime { get; set; }
 
         public event Action ConnectEvent;
 
@@ -241,6 +241,12 @@ namespace OsEngine.Market.Servers.OKX
                 SecurityResponse securityResponseFutures = GetFuturesSecurities();
                 SecurityResponse securityResponseSpot = GetSpotSecurities();
                 securityResponseFutures.data.AddRange(securityResponseSpot.data);
+
+                SecurityResponse securityResponseFuturesContracts = GetFuturesContractsSecurities();
+                if (securityResponseFuturesContracts != null && securityResponseFuturesContracts.data != null)
+                {
+                    securityResponseFutures.data.AddRange(securityResponseFuturesContracts.data);
+                }
 
                 if (_useOptions)
                 {
@@ -294,14 +300,11 @@ namespace OsEngine.Market.Servers.OKX
             }
         }
 
-        private List<string> GetOptionBaseSecurities()
+        private SecurityResponse GetFuturesContractsSecurities()
         {
             try
             {
-                //get list of possible options
-                //HttpResponseMessage response = _httpClient.GetAsync(_baseUrl + "/api/v5/public/underlying?instType=OPTION").Result;
-
-                RestRequest requestRest = new RestRequest("/api/v5/public/underlying?instType=OPTION", Method.GET);
+                RestRequest requestRest = new RestRequest("/api/v5/public/instruments?instType=FUTURES", Method.GET);
                 RestClient client = new RestClient(_baseUrl);
 
                 if (_myProxy != null)
@@ -311,7 +314,35 @@ namespace OsEngine.Market.Servers.OKX
 
                 IRestResponse response = client.Execute(requestRest);
 
-                //string json = response.Content.ReadAsStringAsync().Result;
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    SendLogMessage($"GetFuturesContractsSecurities - {response.Content}", LogMessageType.Error);
+                }
+
+                SecurityResponse securityResponse = JsonConvert.DeserializeAnonymousType(response.Content, new SecurityResponse());
+
+                return securityResponse;
+            }
+            catch (Exception error)
+            {
+                SendLogMessage($"{error.Message} {error.StackTrace}", LogMessageType.Error);
+                return null;
+            }
+        }
+
+        private List<string> GetOptionBaseSecurities()
+        {
+            try
+            {
+                RestRequest requestRest = new RestRequest("/api/v5/public/underlying?instType=OPTION", Method.GET);
+                RestClient client = new RestClient(_baseUrl);
+
+                if (_myProxy != null)
+                {
+                    client.Proxy = _myProxy;
+                }
+
+                IRestResponse response = client.Execute(requestRest);
 
                 if (response.StatusCode != HttpStatusCode.OK)
                 {
@@ -349,8 +380,6 @@ namespace OsEngine.Market.Servers.OKX
                 {
                     string baseSecurity = baseSecurities[k];
 
-                    //HttpResponseMessage response = _httpClient.GetAsync(_baseUrl + "/api/v5/public/instruments?instType=OPTION&uly=" + baseSecurity).Result;
-
                     RestRequest requestRest = new RestRequest("/api/v5/public/instruments?instType=OPTION&uly=" + baseSecurity, Method.GET);
                     RestClient client = new RestClient(_baseUrl);
 
@@ -360,8 +389,6 @@ namespace OsEngine.Market.Servers.OKX
                     }
 
                     IRestResponse response = client.Execute(requestRest);
-
-                    //string json = response.Content.ReadAsStringAsync().Result;
 
                     if (response.StatusCode != HttpStatusCode.OK)
                     {
@@ -431,7 +458,7 @@ namespace OsEngine.Market.Servers.OKX
 
                 SecurityType securityType = SecurityType.CurrencyPair;
 
-                if (item.instType.Equals("SWAP"))
+                if (item.instType.Equals("SWAP") || item.instType.Equals("FUTURES"))
                 {
                     securityType = SecurityType.Futures;
                 }
@@ -442,13 +469,14 @@ namespace OsEngine.Market.Servers.OKX
 
                 security.Name = item.instId;
                 security.NameFull = item.instId;
+                security.NameId = item.instId;
 
                 if (item.lotSz == string.Empty)
                 {
                     continue;
                 }
 
-                security.Lot = item.lotSz.ToDecimal();
+                security.Lot = 1;
                 string volStep = item.minSz.Replace(',', '.');
 
                 if (volStep != null
@@ -460,8 +488,7 @@ namespace OsEngine.Market.Servers.OKX
 
                 security.MinTradeAmountType = MinTradeAmountType.Contract;
                 security.MinTradeAmount = item.minSz.ToDecimal();
-                security.VolumeStep = item.lotSz.ToDecimal();
-
+                security.VolumeStep = item.minSz.ToDecimal();
 
                 if (securityType == SecurityType.CurrencyPair)
                 {
@@ -474,12 +501,22 @@ namespace OsEngine.Market.Servers.OKX
                     {
                         security.NameClass = "SWAP_USD";
                     }
+                    else if (item.instId.Contains("-USDT-"))
+                    {
+                        security.NameClass = "Futures_USDT";
+                    }
                     else
                     {
                         security.NameClass = "SWAP_" + item.settleCcy;
                     }
 
-                    security.Lot = item.ctVal.ToDecimal();
+                    security.NameId = item.instId + "_" + item.ctVal.ToDecimal();
+                    security.MinTradeAmount = item.minSz.ToDecimal() * item.ctVal.ToDecimal();
+                    security.VolumeStep = item.lotSz.ToDecimal() * item.ctVal.ToDecimal();
+                    security.UnderlyingAsset = item.uly;
+
+                    if (item.expTime != "")
+                        security.Expiration = TimeManager.GetDateTimeFromTimeStamp(long.Parse(item.expTime));
                 }
 
                 if (securityType == SecurityType.Option)
@@ -493,11 +530,60 @@ namespace OsEngine.Market.Servers.OKX
                         security.NameClass = "OPTION_" + item.quoteCcy;
                     }
 
-                    security.Lot = item.ctVal.ToDecimal();
+                    //security.Lot = item.ctVal.ToDecimal();
+                    security.Expiration = TimeManager.GetDateTimeFromTimeStamp(long.Parse(item.expTime));
+                    security.OptionType = item.optType == "P" ? OptionType.Put : OptionType.Call;
+                    security.Strike = item.stk.ToDecimal();
+
+                    string baseName = item.uly + "T"; // example: BTC-USD -> BTC-USDT
+
+                    // 1. Find all futures that are true quarterly futures (expire on last Friday of Mar, Jun, Sep, Dec)
+                    var quarterlyFutures = _securities
+                        .Where(s => s.SecurityType == SecurityType.Futures &&
+                                    s.Name.StartsWith(baseName) &&
+                                    s.Expiration != DateTime.MinValue &&
+                                    (s.Expiration.Month == 3 || s.Expiration.Month == 6 || s.Expiration.Month == 9 || s.Expiration.Month == 12) &&
+                                    s.Expiration.DayOfWeek == DayOfWeek.Friday &&
+                       s.Expiration.AddDays(7).Month != s.Expiration.Month)
+                        .ToList();
+
+                    if (quarterlyFutures.Any())
+                    {
+                        // 2. Find the first quarterly future that expires AFTER the option expires.
+                        var nextFuture = quarterlyFutures
+                            .Where(f => f.Expiration >= security.Expiration)
+                            .OrderBy(f => f.Expiration)
+                            .FirstOrDefault();
+
+                        if (nextFuture != null)
+                        {
+                            security.UnderlyingAsset = nextFuture.Name;
+                        }
+                        else
+                        {
+                            // 3. Fallback: If no future expires after the option, take the one with the latest expiration date available.
+                            var latestFuture = quarterlyFutures
+                                .OrderByDescending(f => f.Expiration)
+                                .FirstOrDefault();
+
+                            if (latestFuture != null)
+                            {
+                                security.UnderlyingAsset = latestFuture.Name;
+                            }
+                            else
+                            {
+                                security.UnderlyingAsset = item.uly;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // 4. Fallback: No quarterly futures found at all for this underlying.
+                        security.UnderlyingAsset = item.uly;
+                    }
                 }
 
                 security.Exchange = ServerType.OKX.ToString();
-                security.NameId = item.instId;
                 security.SecurityType = securityType;
                 security.PriceStep = item.tickSz.ToDecimal();
                 security.PriceStepCost = security.PriceStep;
@@ -512,8 +598,6 @@ namespace OsEngine.Market.Servers.OKX
                     security.Decimals = 0;
                 }
 
-
-
                 security.State = SecurityStateType.Activ;
                 _securities.Add(security);
             }
@@ -523,8 +607,6 @@ namespace OsEngine.Market.Servers.OKX
                 SecurityEvent(_securities);
             }
         }
-
-
 
         public event Action<List<Security>> SecurityEvent;
 
@@ -551,128 +633,70 @@ namespace OsEngine.Market.Servers.OKX
 
         public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
         {
-            return GetLastCandleHistoryRecursive(security, timeFrameBuilder, candleCount, 1);
+            int tfTotalMinutes = (int)timeFrameBuilder.TimeFrameTimeSpan.TotalMinutes;
+            DateTime endTime = DateTime.UtcNow;
+            DateTime startTime = endTime.AddMinutes(-tfTotalMinutes * candleCount);
+
+            return GetCandleData(security, timeFrameBuilder, startTime, endTime, endTime, false);
         }
 
-        public List<Candle> GetLastCandleHistoryRecursive(
-            Security security, TimeFrameBuilder timeFrameBuilder, int candleCount, int countOfCalls)
+        public List<Candle> GetCandleDataToSecurity(Security security, TimeFrameBuilder timeFrameBuilder, DateTime startTime, DateTime endTime, DateTime actualTime)
         {
-            try
-            {
-                _rateGateCandles.WaitToProceed();
-
-                CandlesResponse securityResponse = GetResponseCandles(security.Name, timeFrameBuilder.TimeFrameTimeSpan);
-
-                if (securityResponse == null)
-                {
-                    securityResponse = GetResponseCandles(security.Name, timeFrameBuilder.TimeFrameTimeSpan);
-                }
-
-                if (securityResponse == null)
-                {
-                    return null;
-                }
-
-                List<Candle> candles = new List<Candle>();
-
-                ConvertCandles(securityResponse, candles);
-
-                if (candles == null ||
-                   candles.Count == 0)
-                {
-                    return null;
-                }
-
-                candles.Reverse();
-
-                if (candles != null && candles.Count != 0)
-                {
-                    for (int i = 0; i < candles.Count; i++)
-                    {
-                        candles[i].State = CandleState.Finished;
-                    }
-                    candles[candles.Count - 1].State = CandleState.Started;
-                }
-
-                return candles;
-            }
-            catch
-            {
-
-            }
-
-            if (countOfCalls < 5)
-            {
-                countOfCalls++;
-                return GetLastCandleHistoryRecursive(security, timeFrameBuilder, candleCount, countOfCalls);
-            }
-
-            return null;
+            return GetCandleData(security, timeFrameBuilder, startTime, endTime, actualTime, true);
         }
 
-        private CandlesResponse GetResponseCandles(string nameSec, TimeSpan tf)
+        public List<Candle> GetCandleData(Security security, TimeFrameBuilder timeFrameBuilder, DateTime startTime, DateTime endTime, DateTime actualTime, bool isOsData)
         {
-            try
+            startTime = DateTime.SpecifyKind(startTime, DateTimeKind.Utc);
+            endTime = DateTime.SpecifyKind(endTime, DateTimeKind.Utc);
+            actualTime = DateTime.SpecifyKind(actualTime, DateTimeKind.Utc);
+
+            if (startTime < DateTime.UtcNow.AddMonths(-3))
             {
-                int NumberCandlesToLoad = GetCountCandlesToLoad();
-
-                string bar = GetStringBar(tf);
-
-                CandlesResponse candlesResponse = new CandlesResponse();
-                candlesResponse.data = new List<List<string>>();
-
-                do
-                {
-                    int limit = NumberCandlesToLoad;
-
-                    if (NumberCandlesToLoad > 100)
-                    {
-                        limit = 100;
-                    }
-
-                    string after = String.Empty;
-
-                    if (candlesResponse.data.Count != 0)
-                    {
-                        after = $"&after={candlesResponse.data[candlesResponse.data.Count - 1][0]}";
-                    }
-
-                    string url = _baseUrl + $"/api/v5/market/history-candles?instId={nameSec}&bar={bar}&limit={limit}" + after;
-
-                    HttpResponseMessage Response = _httpClient.GetAsync(url).Result;
-                    string json = Response.Content.ReadAsStringAsync().Result;
-                    candlesResponse.data.AddRange(JsonConvert.DeserializeAnonymousType(json, new CandlesResponse()).data);
-
-                    if (Response.StatusCode != HttpStatusCode.OK)
-                    {
-                        SendLogMessage($"GetResponseCandles - {json}", LogMessageType.Error);
-                    }
-
-                    NumberCandlesToLoad -= limit;
-
-                } while (NumberCandlesToLoad > 0);
-
-                return candlesResponse;
-            }
-            catch (Exception error)
-            {
-                SendLogMessage($"{error.Message} {error.StackTrace}", LogMessageType.Error);
+                SendLogMessage("History more than 3 months is not supported by Api", LogMessageType.Error);
                 return null;
             }
-        }
 
-        private int GetCountCandlesToLoad()
-        {
-            for (int i = 0; i < ServerParameters.Count; i++)
+            if (!CheckTime(startTime, endTime, actualTime))
             {
-                if (ServerParameters[i].Name.Equals("Candles to load"))
+                return null;
+            }
+
+            int tfTotalMinutes = (int)timeFrameBuilder.TimeFrameTimeSpan.TotalMinutes;
+
+            if (!CheckTf(tfTotalMinutes))
+            {
+                return null;
+            }
+
+            if (endTime > DateTime.UtcNow)
+            {
+                endTime = DateTime.UtcNow;
+            }
+
+            int CountCandlesNeedToLoad = GetCountCandlesFromTimeInterval(startTime, endTime, timeFrameBuilder.TimeFrameTimeSpan);
+
+            List<Candle> candles = GetCandleDataHistory(security.Name, timeFrameBuilder.TimeFrameTimeSpan, CountCandlesNeedToLoad, TimeManager.GetTimeStampMilliSecondsToDateTime(endTime), isOsData);
+
+            for (int i = 0; i < candles.Count; i++)
+            {
+                if (candles[i].TimeStart > endTime)
                 {
-                    ServerParameterInt Param = (ServerParameterInt)ServerParameters[i];
-                    return Param.Value;
+                    candles.RemoveAt(i);
+                    i--;
                 }
             }
 
-            return 100;
+            for (int i = 1; i < candles.Count; i++)
+            {
+                if (candles[i - 1].TimeStart == candles[i].TimeStart)
+                {
+                    candles.RemoveAt(i);
+                    i--;
+                }
+            }
+
+            return candles;
         }
 
         private void ConvertCandles(CandlesResponse candlesResponse, List<Candle> candles)
@@ -700,59 +724,6 @@ namespace OsEngine.Market.Servers.OKX
             }
         }
 
-        public List<Candle> GetCandleDataToSecurity(Security security, TimeFrameBuilder timeFrameBuilder, DateTime startTime, DateTime endTime, DateTime actualTime)
-        {
-            startTime = DateTime.SpecifyKind(startTime, DateTimeKind.Utc);
-            endTime = DateTime.SpecifyKind(endTime, DateTimeKind.Utc);
-            actualTime = DateTime.SpecifyKind(actualTime, DateTimeKind.Utc);
-
-            if (timeFrameBuilder.TimeFrame == TimeFrame.Min1
-                || timeFrameBuilder.TimeFrame == TimeFrame.Min2
-                || timeFrameBuilder.TimeFrame == TimeFrame.Min10)
-            {
-                return null;
-            }
-
-            if (actualTime > endTime)
-            {
-                return null;
-            }
-
-            if (startTime > endTime)
-            {
-                return null;
-            }
-
-            if (endTime > DateTime.UtcNow)
-            {
-                endTime = DateTime.UtcNow;
-            }
-
-            int CountCandlesNeedToLoad = GetCountCandlesFromTimeInterval(startTime, endTime, timeFrameBuilder.TimeFrameTimeSpan);
-
-            List<Candle> candles = GetCandleDataHistory(security.Name, timeFrameBuilder.TimeFrameTimeSpan, CountCandlesNeedToLoad, TimeManager.GetTimeStampMilliSecondsToDateTime(endTime));
-
-            for (int i = 0; i < candles.Count; i++)
-            {
-                if (candles[i].TimeStart > endTime)
-                {
-                    candles.RemoveAt(i);
-                    i--;
-                }
-            }
-
-            for (int i = 1; i < candles.Count; i++)
-            {
-                if (candles[i - 1].TimeStart == candles[i].TimeStart)
-                {
-                    candles.RemoveAt(i);
-                    i--;
-                }
-            }
-
-            return candles;
-        }
-
         private int GetCountCandlesFromTimeInterval(DateTime startTime, DateTime endTime, TimeSpan timeFrameSpan)
         {
             TimeSpan timeSpanInterval = endTime - startTime;
@@ -771,9 +742,9 @@ namespace OsEngine.Market.Servers.OKX
             }
         }
 
-        public List<Candle> GetCandleDataHistory(string nameSec, TimeSpan tf, int NumberCandlesToLoad, long DataEnd)
+        public List<Candle> GetCandleDataHistory(string nameSec, TimeSpan tf, int NumberCandlesToLoad, long DataEnd, bool isOsData)
         {
-            CandlesResponse securityResponse = GetResponseDataCandles(nameSec, tf, NumberCandlesToLoad, DataEnd);
+            CandlesResponse securityResponse = GetResponseDataCandles(nameSec, tf, NumberCandlesToLoad, DataEnd, isOsData);
 
             List<Candle> candles = new List<Candle>();
 
@@ -784,7 +755,7 @@ namespace OsEngine.Market.Servers.OKX
             return candles;
         }
 
-        private CandlesResponse GetResponseDataCandles(string nameSec, TimeSpan tf, int NumberCandlesToLoad, long DataEnd)
+        private CandlesResponse GetResponseDataCandles(string nameSec, TimeSpan tf, int NumberCandlesToLoad, long DataEnd, bool isOsData)
         {
             _rateGateCandles.WaitToProceed();
 
@@ -795,16 +766,15 @@ namespace OsEngine.Market.Servers.OKX
                 CandlesResponse candlesResponse = new CandlesResponse();
                 candlesResponse.data = new List<List<string>>();
 
-                //Thread.Sleep(1000);
-
                 do
                 {
                     _rateGateCandles.WaitToProceed();
 
                     int limit = NumberCandlesToLoad;
-                    if (NumberCandlesToLoad > 100)
+
+                    if (NumberCandlesToLoad > 300)
                     {
-                        limit = 100;
+                        limit = 300;
                     }
 
                     string after = $"&after={Convert.ToString(DataEnd)}";
@@ -814,14 +784,16 @@ namespace OsEngine.Market.Servers.OKX
                         after = $"&after={candlesResponse.data[candlesResponse.data.Count - 1][0]}";
                     }
 
-                    string url = _baseUrl + $"/api/v5/market/history-candles?instId={nameSec}&bar={bar}&limit={limit}" + after;
+                    string url = _baseUrl + $"/api/v5/market/candles?instId={nameSec}&bar={bar}&limit={limit}" + after;
+
+                    if (isOsData)
+                    {
+                        url = _baseUrl + $"/api/v5/market/candles?instId={nameSec}&bar={bar}&limit={limit}" + after;
+                    }
 
                     RestClient client = new RestClient(url);
                     RestRequest request = new RestRequest(Method.GET);
                     IRestResponse Response = client.Execute(request);
-
-                    //HttpResponseMessage Response = _httpClient.GetAsync(url).Result;
-                    //string json = Response.Content.ReadAsStringAsync().Result;
 
                     if (Response.StatusCode == HttpStatusCode.OK)
                     {
@@ -846,6 +818,23 @@ namespace OsEngine.Market.Servers.OKX
             return null;
         }
 
+        private bool CheckTf(int timeFrameMinutes)
+        {
+            if (timeFrameMinutes == 1
+                || timeFrameMinutes == 3
+                || timeFrameMinutes == 5
+                || timeFrameMinutes == 15
+                || timeFrameMinutes == 30
+                || timeFrameMinutes == 60
+                || timeFrameMinutes == 120
+                || timeFrameMinutes == 240
+                || timeFrameMinutes == 1440)
+            {
+                return true;
+            }
+            return false;
+        }
+
         private string GetStringBar(TimeSpan tf)
         {
             try
@@ -860,7 +849,7 @@ namespace OsEngine.Market.Servers.OKX
                 }
                 if (tf.Days != 0)
                 {
-                    return $"{tf.Days}D";
+                    return $"{tf.Days}Dutc";
                 }
             }
             catch (Exception error)
@@ -1400,6 +1389,7 @@ namespace OsEngine.Market.Servers.OKX
                 {
                     string message = this.GetType().Name + OsLocalization.Market.Message101 + "\n";
                     message += OsLocalization.Market.Message102;
+                    message += $"Server: {e.Code} {e.Reason}";
 
                     SendLogMessage(message, LogMessageType.Error);
                     ServerStatus = ServerConnectStatus.Disconnect;
@@ -1432,6 +1422,11 @@ namespace OsEngine.Market.Servers.OKX
                 if (e.Data.Contains("login"))
                 {
                     SubscribePrivate();
+                }
+
+                if (e.Data.Contains("error"))
+                {
+                    SendLogMessage("Error received from server: "+ e.Data.ToString(), LogMessageType.Error);
                 }
 
                 if (FIFOListWebSocketPrivateMessage == null)
@@ -1724,6 +1719,7 @@ namespace OsEngine.Market.Servers.OKX
                 _webSocketPrivate.SendAsync($"{{\"op\": \"subscribe\",\"args\": [{{\"channel\": \"account\"}}]}}");
                 _webSocketPrivate.SendAsync($"{{\"op\": \"subscribe\",\"args\": [{{\"channel\": \"positions\",\"instType\": \"ANY\"}}]}}");
                 _webSocketPrivate.SendAsync($"{{\"op\": \"subscribe\",\"args\": [{{\"channel\": \"orders\",\"instType\": \"ANY\"}}]}}");
+                //_webSocketPrivate.SendAsync($"{{\"op\": \"subscribe\",\"args\": [{{\"channel\": \"fills\"}}]}}");
             }
             catch (Exception exception)
             {
@@ -1800,6 +1796,7 @@ namespace OsEngine.Market.Servers.OKX
                     _webSocketPrivate.SendAsync($"{{\"op\": \"unsubscribe\",\"args\": [{{\"channel\": \"account\"}}]}}");
                     _webSocketPrivate.SendAsync($"{{\"op\": \"unsubscribe\",\"args\": [{{\"channel\": \"positions\",\"instType\": \"ANY\"}}]}}");
                     _webSocketPrivate.SendAsync($"{{\"op\": \"unsubscribe\",\"args\": [{{\"channel\": \"orders\",\"instType\": \"ANY\"}}]}}");
+                    //_webSocketPrivate.SendAsync($"{{\"op\": \"unsubscribe\",\"args\": [{{\"channel\": \"fills\"}}]}}");
                 }
                 catch
                 {
@@ -1857,7 +1854,7 @@ namespace OsEngine.Market.Servers.OKX
                     if (action.@event != null && action.@event.Contains("subscribe"))
                     {
                         //ignore
-                        SendLogMessage("[WS Public] Got subscribe msg: " + action.msg, LogMessageType.System);
+                        //SendLogMessage("[WS Public] Got subscribe msg: " + action.msg, LogMessageType.System);
                     }
                     else if (action.arg != null)
                     {
@@ -1957,11 +1954,13 @@ namespace OsEngine.Market.Servers.OKX
                             UpdateAccount(message);
                             continue;
                         }
+
                         if (action.arg.channel.Equals("positions"))
                         {
                             UpdatePositions(message);
                             continue;
                         }
+
                         if (action.arg.channel.Equals("orders"))
                         {
                             UpdateOrder(message);
@@ -2012,21 +2011,21 @@ namespace OsEngine.Market.Servers.OKX
                                 if (item.posSide.Contains("long"))
                                 {
                                     pos.SecurityNameCode = item.instId + "_LONG";
-                                    pos.ValueCurrent = Math.Round(GetAvailPos(item.pos), 6);
+                                    pos.ValueCurrent = Math.Round(GetAvailPos(item.pos) * GetVolume(item.instId), 6);
                                     pos.ValueBlocked = 0;
                                     pos.UnrealizedPnl = Math.Round(GetAvailPos(item.upl), 6);
                                 }
                                 else if (item.posSide.Contains("short"))
                                 {
                                     pos.SecurityNameCode = item.instId + "_SHORT";
-                                    pos.ValueCurrent = -Math.Round(GetAvailPos(item.pos), 6);
+                                    pos.ValueCurrent = -Math.Round(GetAvailPos(item.pos) * GetVolume(item.instId), 6);
                                     pos.ValueBlocked = 0;
                                     pos.UnrealizedPnl = Math.Round(GetAvailPos(item.upl), 6);
                                 }
                                 else if (item.posSide.Contains("net"))
                                 {
                                     pos.SecurityNameCode = item.instId;
-                                    pos.ValueCurrent = Math.Round(GetAvailPos(item.pos), 6);
+                                    pos.ValueCurrent = Math.Round(GetAvailPos(item.pos) * GetVolume(item.instId), 6);
                                     pos.ValueBlocked = 0;
                                     pos.UnrealizedPnl = Math.Round(GetAvailPos(item.upl), 6);
                                 }
@@ -2047,7 +2046,6 @@ namespace OsEngine.Market.Servers.OKX
                 {
                     SendLogMessage("OKX ERROR. NO POSITIONS IN REQUEST.", LogMessageType.Error);
                 }
-                // _portfolioIsStarted = true;
 
                 PortfolioEvent(Portfolios);
             }
@@ -2310,30 +2308,52 @@ namespace OsEngine.Market.Servers.OKX
                         MyOrderEvent(newOrder);
                     }
 
-                    if (newOrder.State == OrderStateType.Partial ||
-                        newOrder.State == OrderStateType.Done)
+                    if (newOrder.State == OrderStateType.Partial
+                        /*|| newOrder.State == OrderStateType.Done*/)
                     {
                         ResponseWsOrders item = OrderResponse.data[i];
 
                         MyTrade myTrade = new MyTrade();
 
                         myTrade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(item.cTime));
+                        myTrade.SecurityNameCode = item.instId;
                         myTrade.NumberOrderParent = item.ordId.ToString();
                         myTrade.NumberTrade = item.tradeId.ToString();
 
-                        if (string.IsNullOrEmpty(item.fee))
+                        if (item.instId.Contains("SWAP"))
                         {
-                            myTrade.Volume = item.fillSz.ToDecimal();
-                        }
-                        else
-                        {// there is a commission
-                            if (item.instId.StartsWith(item.feeCcy))
-                            { // the commission is taken in the traded currency, not in the exchange currency
-                                myTrade.Volume = item.fillSz.ToDecimal() + item.fee.ToDecimal();
+                            if (string.IsNullOrEmpty(item.fee))
+                            {
+                                myTrade.Volume = item.fillSz.ToDecimal() * GetVolume(item.instId);
                             }
                             else
+                            {// there is a commission
+                                if (item.instId.StartsWith(item.feeCcy))
+                                { // the commission is taken in the traded currency, not in the exchange currency
+                                    myTrade.Volume = item.fillSz.ToDecimal() * GetVolume(item.instId) + item.fee.ToDecimal();
+                                }
+                                else
+                                {
+                                    myTrade.Volume = item.fillSz.ToDecimal() * GetVolume(item.instId);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (string.IsNullOrEmpty(item.fee))
                             {
                                 myTrade.Volume = item.fillSz.ToDecimal();
+                            }
+                            else
+                            {// there is a commission
+                                if (item.instId.StartsWith(item.feeCcy))
+                                { // the commission is taken in the traded currency, not in the exchange currency
+                                    myTrade.Volume = item.fillSz.ToDecimal() + item.fee.ToDecimal();
+                                }
+                                else
+                                {
+                                    myTrade.Volume = item.fillSz.ToDecimal();
+                                }
                             }
                         }
 
@@ -2342,7 +2362,6 @@ namespace OsEngine.Market.Servers.OKX
                             myTrade.Price = item.fillPx.ToDecimal();
                         }
 
-                        myTrade.SecurityNameCode = item.instId;
                         myTrade.Side = item.side.Equals("buy") ? Side.Buy : Side.Sell;
 
                         MyTradeEvent(myTrade);
@@ -2384,21 +2403,22 @@ namespace OsEngine.Market.Servers.OKX
 
             }
 
-            //int.TryParse(item.clOrdId, out newOrder.NumberUser);
-
             newOrder.NumberMarket = item.ordId.ToString();
             newOrder.Side = item.side.Equals("buy") ? Side.Buy : Side.Sell;
-            newOrder.Volume = item.sz.ToDecimal();
+
+            if (item.instId.Contains("SWAP"))
+            {
+                newOrder.Volume = item.sz.ToDecimal() * GetVolume(item.instId);
+            }
+            else
+            {
+                newOrder.Volume = item.sz.ToDecimal();
+            }
+
             newOrder.PortfolioNumber = "OKX";
 
-            //if (string.IsNullOrEmpty(item.avgPx) == false
-            //    && item.avgPx != "0")
-            //{
-            //    //newOrder.Price = item.avgPx.ToDecimal();
-            //}
-            /*else*/
             if (string.IsNullOrEmpty(item.px) == false
-       && item.px != "0")
+                && item.px != "0")
             {
                 newOrder.Price = item.px.ToDecimal();
             }
@@ -2696,7 +2716,6 @@ namespace OsEngine.Market.Servers.OKX
                 orderRequest.Add("side", order.Side == Side.Buy ? "buy" : "sell");
                 orderRequest.Add("ordType", order.TypeOrder.ToString().ToLower());
 
-
                 if (order.TypeOrder == OrderPriceType.Limit)
                 {
                     orderRequest.Add("px", order.Price.ToString().Replace(",", "."));
@@ -2720,10 +2739,18 @@ namespace OsEngine.Market.Servers.OKX
 
                 ResponseRestMessage<List<RestMessageSendOrder>> message = JsonConvert.DeserializeAnonymousType(contentStr, new ResponseRestMessage<List<RestMessageSendOrder>>());
 
-                if (message.code.Equals("1"))
+                if (res.StatusCode == HttpStatusCode.OK)
                 {
+                    if (message.code.Equals("1"))
+                    {
+                        CreateOrderFail(order);
+                        SendLogMessage($"SendOrderSpot - {message.data[0].sMsg}", LogMessageType.Error);
+                    }
+                }
+                else
+                {
+                    SendLogMessage($"Spot Order Fail. Status: {res.StatusCode} || {contentStr}", LogMessageType.Error);
                     CreateOrderFail(order);
-                    SendLogMessage($"SendOrderSpot - {message.data[0].sMsg}", LogMessageType.Error);
                 }
             }
             catch (Exception ex)
@@ -2760,7 +2787,9 @@ namespace OsEngine.Market.Servers.OKX
                 orderRequest.Add("side", order.Side == Side.Buy ? "buy" : "sell");
                 orderRequest.Add("ordType", order.TypeOrder.ToString().ToLower());
                 orderRequest.Add("px", order.Price.ToString().Replace(",", "."));
-                orderRequest.Add("sz", order.Volume.ToString().Replace(",", "."));
+
+                decimal volume = order.Volume / GetVolume(order.SecurityNameCode);
+                orderRequest.Add("sz", volume.ToString().Replace(",", "."));
                 orderRequest.Add("posSide", posSide);
                 orderRequest.Add("tag", "5faf8b0e85c1BCDE");
 
@@ -2772,18 +2801,46 @@ namespace OsEngine.Market.Servers.OKX
                 HttpResponseMessage res = responseMessage.PostAsync(url, new StringContent(json, Encoding.UTF8, "application/json")).Result;
                 string contentStr = res.Content.ReadAsStringAsync().Result;
 
-                ResponseRestMessage<List<RestMessageSendOrder>> message = JsonConvert.DeserializeAnonymousType(contentStr, new ResponseRestMessage<List<RestMessageSendOrder>>());
-
-                if (message.code.Equals("1"))
+                if (res.StatusCode == HttpStatusCode.OK)
                 {
+                    ResponseRestMessage<List<RestMessageSendOrder>> message = JsonConvert.DeserializeAnonymousType(contentStr, new ResponseRestMessage<List<RestMessageSendOrder>>());
+
+                    if (message.code.Equals("1"))
+                    {
+                        CreateOrderFail(order);
+                        SendLogMessage($"SendOrderSwap - {message.data[0].sMsg}", LogMessageType.Error);
+                    }
+                }
+                else
+                {
+                    SendLogMessage($"Swap Order Fail. Status: {res.StatusCode} || {contentStr}", LogMessageType.Error);
                     CreateOrderFail(order);
-                    SendLogMessage($"SendOrderSwap - {message.data[0].sMsg}", LogMessageType.Error);
                 }
             }
             catch (Exception ex)
             {
                 SendLogMessage($"SendOrderSwap - {ex.Message}", LogMessageType.Error);
             }
+        }
+
+        private decimal GetVolume(string securityName)
+        {
+            decimal minVolume = 1;
+
+            for (int i = 0; i < _securities.Count; i++)
+            {
+                if (_securities[i].Name == securityName)
+                {
+                    minVolume = _securities[i].NameId.Split('_')[1].ToDecimal();
+                }
+            }
+
+            if (minVolume <= 0)
+            {
+                return 1;
+            }
+
+            return minVolume;
         }
 
         private void CreateOrderFail(Order order)
@@ -2817,18 +2874,25 @@ namespace OsEngine.Market.Servers.OKX
 
                 ResponseRestMessage<List<RestMessageSendOrder>> message = JsonConvert.DeserializeAnonymousType(contentStr, new ResponseRestMessage<List<RestMessageSendOrder>>());
 
-                if (message.code.Equals("1"))
+                if (res.StatusCode == HttpStatusCode.OK)
                 {
-                    OrderStateType state = GetOrderStatus(order);
-
-                    if (state == OrderStateType.None)
+                    if (message.code.Equals("0"))
                     {
-                        SendLogMessage($"Cancel Order Error. {order.NumberUser} || {contentStr}.", LogMessageType.Error);
-                        return false;
+                        return true;
                     }
                     else
                     {
-                        return true;
+                        OrderStateType state = GetOrderStatus(order);
+
+                        if (state == OrderStateType.None)
+                        {
+                            SendLogMessage($"Cancel Order Error. {order.NumberUser} || {contentStr}.", LogMessageType.Error);
+                            return false;
+                        }
+                        else
+                        {
+                            return true;
+                        }
                     }
                 }
                 else
@@ -2837,7 +2901,7 @@ namespace OsEngine.Market.Servers.OKX
 
                     if (state == OrderStateType.None)
                     {
-                        SendLogMessage($"Cancel order failed. Status:   {res.StatusCode} || {contentStr}", LogMessageType.Error);
+                        SendLogMessage($"Cancel order failed. Status: {res.StatusCode} || {contentStr}", LogMessageType.Error);
                         return false;
                     }
                     else
@@ -2907,95 +2971,73 @@ namespace OsEngine.Market.Servers.OKX
             return ordersOpenAll;
         }
 
+        private List<Order> _activeOrdersCash = new List<Order>();
+        private List<Order> _historicalOrdersCash = new List<Order>();
+        private DateTime _timeOrdersCashCreate;
+
         public OrderStateType GetOrderStatus(Order order)
         {
-            _rateGateOrder.WaitToProceed();
-
             try
             {
-                string url;
-
-                if (string.IsNullOrEmpty(order.NumberMarket))
+                if (_timeOrdersCashCreate.AddSeconds(2) < DateTime.Now)
                 {
-                    url =
-                        $"{_baseUrl}/api/v5/trade/order"
-                        + $"?clOrdId={order.NumberUser}&"
-                        + $"instId={order.SecurityNameCode}";
-                }
-                else
-                {
-                    url =
-                        $"{_baseUrl}/api/v5/trade/order"
-                        + $"?ordId={order.NumberMarket}&"
-                        + $"clOrdId={order.NumberUser}&"
-                        + $"instId={order.SecurityNameCode}";
+                    // We update order arrays once every two seconds.
+                    // We are creating a cache for mass requesting statuses on reconnection.
+                    _historicalOrdersCash = GetHistoricalOrders(0, 100);
+                    _activeOrdersCash = GetActiveOrders(0, 100);
+                    _timeOrdersCashCreate = DateTime.Now;
                 }
 
+                Order myOrder = null;
 
-                HttpResponseMessage res = GetPrivateRequest(url);
-                string contentStr = res.Content.ReadAsStringAsync().Result;
-
-                if (res.StatusCode == HttpStatusCode.OK)
+                for (int i = 0; _historicalOrdersCash != null && i < _historicalOrdersCash.Count; i++)
                 {
-                    ResponseWsMessageAction<List<ResponseWsOrders>> OrderResponse = JsonConvert.DeserializeAnonymousType(contentStr, new ResponseWsMessageAction<List<ResponseWsOrders>>());
-
-                    if (OrderResponse.data == null || OrderResponse.data.Count == 0)
+                    if (_historicalOrdersCash[i].NumberUser == order.NumberUser)
                     {
-                        return OrderStateType.None;
-                    }
-
-                    OrderStateType myOrderState = OrderStateType.None;
-
-                    for (int i = 0; i < OrderResponse.data.Count; i++)
-                    {
-                        Order newOrder = null;
-
-                        if ((OrderResponse.data[i].ordType.Equals("limit") ||
-                        OrderResponse.data[i].ordType.Equals("market")))
-                        {
-                            newOrder = OrderUpdate(OrderResponse.data[i]);
-                        }
-
-                        if (newOrder == null)
-                        {
-                            continue;
-                        }
-
-                        if (MyOrderEvent != null)
-                        {
-                            MyOrderEvent(newOrder);
-                        }
-
-                        if (newOrder.NumberUser == order.NumberUser)
-                        {
-                            myOrderState = newOrder.State;
-                        }
-
-                        if (newOrder.State == OrderStateType.Partial ||
-                            newOrder.State == OrderStateType.Done)
-                        {
-                            Thread.Sleep(500);
-                            List<MyTrade> tradesInOrder = GenerateTradesToOrder(newOrder, 1);
-
-                            for (int i2 = 0; tradesInOrder != null && i2 < tradesInOrder.Count; i2++)
-                            {
-                                MyTradeEvent(tradesInOrder[i2]);
-                            }
-                        }
-
-                        return myOrderState;
+                        myOrder = _historicalOrdersCash[i];
+                        break;
                     }
                 }
-                else
+
+                if (myOrder == null)
                 {
-                    SendLogMessage($"GetOrderStatus - {contentStr}", LogMessageType.Error);
+                    for (int i = 0; _activeOrdersCash != null && i < _activeOrdersCash.Count; i++)
+                    {
+                        if (_activeOrdersCash[i].NumberUser == order.NumberUser)
+                        {
+                            myOrder = _activeOrdersCash[i];
+                            break;
+                        }
+                    }
+                }
+
+                if (myOrder == null)
+                {
                     return OrderStateType.None;
                 }
+
+                MyOrderEvent?.Invoke(myOrder);
+
+                // check trades
+
+                if (myOrder.State == OrderStateType.Partial
+                    || myOrder.State == OrderStateType.Done)
+                {
+                    List<MyTrade> tradesInOrder = GetMyTradesBySecurity(myOrder, 1);
+
+                    for (int i2 = 0; tradesInOrder != null && i2 < tradesInOrder.Count; i2++)
+                    {
+                        MyTradeEvent(tradesInOrder[i2]);
+                    }
+                }
+
+                return myOrder.State;
             }
             catch (Exception ex)
             {
-                SendLogMessage($"GetOrderStatus - {ex.Message}", LogMessageType.Error);
+                SendLogMessage($"GetOrderStatus>. Order error. {ex.Message} {ex.StackTrace}", LogMessageType.Error);
             }
+
             return OrderStateType.None;
         }
 
@@ -3009,57 +3051,67 @@ namespace OsEngine.Market.Servers.OKX
                 HttpResponseMessage res = GetPrivateRequest(url);
                 string contentStr = res.Content.ReadAsStringAsync().Result;
 
-                if (res.StatusCode != HttpStatusCode.OK)
+                if (res.StatusCode == HttpStatusCode.OK)
                 {
-                    SendLogMessage($"GetActivOrders - {contentStr}", LogMessageType.Error);
-                    return;
-                }
+                    ResponseRestMessage<List<ResponseWsOrders>> OrderResponse = JsonConvert.DeserializeAnonymousType(contentStr, new ResponseRestMessage<List<ResponseWsOrders>>());
 
-                ResponseWsMessageAction<List<ResponseWsOrders>> OrderResponse = JsonConvert.DeserializeAnonymousType(contentStr, new ResponseWsMessageAction<List<ResponseWsOrders>>());
-
-                List<Order> orders = new List<Order>();
-
-                for (int i = 0; i < OrderResponse.data.Count; i++)
-                {
-                    Order newOrder = null;
-
-                    if ((OrderResponse.data[i].ordType.Equals("limit") ||
-                        OrderResponse.data[i].ordType.Equals("market")))
+                    if (OrderResponse.code.Equals("0"))
                     {
-                        newOrder = OrderUpdate(OrderResponse.data[i]);
-                    }
+                        List<Order> orders = new List<Order>();
 
-                    if (newOrder == null)
-                    {
-                        continue;
-                    }
-
-                    orders.Add(newOrder);
-                }
-
-                if (orders.Count > 0)
-                {
-                    array.AddRange(orders);
-
-                    if (array.Count > maxCount)
-                    {
-                        while (array.Count > maxCount)
+                        for (int i = 0; i < OrderResponse.data.Count; i++)
                         {
-                            array.RemoveAt(array.Count - 1);
+                            Order newOrder = null;
+
+                            if ((OrderResponse.data[i].ordType.Equals("limit") ||
+                                OrderResponse.data[i].ordType.Equals("market")))
+                            {
+                                newOrder = OrderUpdate(OrderResponse.data[i]);
+                            }
+
+                            if (newOrder == null)
+                            {
+                                continue;
+                            }
+
+                            orders.Add(newOrder);
                         }
+
+                        if (orders.Count > 0)
+                        {
+                            array.AddRange(orders);
+
+                            if (array.Count > maxCount)
+                            {
+                                while (array.Count > maxCount)
+                                {
+                                    array.RemoveAt(array.Count - 1);
+                                }
+                                return;
+                            }
+                            else if (array.Count < 100)
+                            {
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            return;
+                        }
+
                         return;
                     }
-                    else if (array.Count < 50)
+                    else
                     {
+                        SendLogMessage($"Get all open orders failed: {OrderResponse.code} || msg: {OrderResponse.msg}", LogMessageType.Error);
                         return;
                     }
                 }
                 else
                 {
+                    SendLogMessage($"Get all open orders request error {res.StatusCode} || {contentStr}", LogMessageType.Error);
                     return;
                 }
-
-                return;
             }
             catch (Exception ex)
             {
@@ -3070,19 +3122,11 @@ namespace OsEngine.Market.Servers.OKX
 
         private RateGate _rateGateGenerateToTrade = new RateGate(1, TimeSpan.FromMilliseconds(200));
 
-        private List<MyTrade> GenerateTradesToOrder(Order order, int CountOfCalls)
+        private List<MyTrade> GetMyTradesBySecurity(Order order, int CountOfCalls)
         {
             try
             {
                 _rateGateGenerateToTrade.WaitToProceed();
-
-                List<MyTrade> myTrades = new List<MyTrade>();
-
-                if (CountOfCalls >= 8)
-                {
-                    SendLogMessage($"Trade is not found to order: {order.NumberUser}", LogMessageType.Error);
-                    return myTrades;
-                }
 
                 string TypeInstr = order.SecurityNameCode.EndsWith("SWAP") ? "SWAP" : "SPOT";
 
@@ -3092,73 +3136,90 @@ namespace OsEngine.Market.Servers.OKX
 
                 string contentStr = res.Content.ReadAsStringAsync().Result;
 
-                if (res.StatusCode != HttpStatusCode.OK)
+                if (res.StatusCode == HttpStatusCode.OK)
                 {
-                    SendLogMessage($"GenerateTradesToOrder - {contentStr}", LogMessageType.Error);
+                    TradeDetailsResponse quotes = JsonConvert.DeserializeAnonymousType(contentStr, new TradeDetailsResponse());
+
+                    if (quotes.code.Equals("0"))
+                    {
+                        List<MyTrade> myTrades = new List<MyTrade>();
+
+                        for (int i = 0; i < quotes.data.Count; i++)
+                        {
+                            TradeDetailsObject item = quotes.data[i];
+
+                            MyTrade myTrade = new MyTrade();
+
+                            myTrade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(item.ts));
+                            myTrade.SecurityNameCode = item.instId;
+                            myTrade.NumberOrderParent = item.ordId.ToString();
+                            myTrade.NumberTrade = item.tradeId.ToString();
+
+                            if (item.instId.Contains("SWAP"))
+                            {
+                                if (string.IsNullOrEmpty(item.fee))
+                                {
+                                    myTrade.Volume = item.fillSz.ToDecimal() * GetVolume(item.instId);
+                                }
+                                else
+                                {// there is a commission
+                                    if (item.instId.StartsWith(item.feeCcy))
+                                    { // the commission is taken in the traded currency, not in the exchange currency
+                                        myTrade.Volume = item.fillSz.ToDecimal() * GetVolume(item.instId) + item.fee.ToDecimal();
+                                    }
+                                    else
+                                    {
+                                        myTrade.Volume = item.fillSz.ToDecimal() * GetVolume(item.instId);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                if (string.IsNullOrEmpty(item.fee))
+                                {
+                                    myTrade.Volume = item.fillSz.ToDecimal();
+                                }
+                                else
+                                {// there is a commission
+                                    if (item.instId.StartsWith(item.feeCcy))
+                                    { // the commission is taken in the traded currency, not in the exchange currency
+                                        myTrade.Volume = item.fillSz.ToDecimal() + item.fee.ToDecimal();
+                                    }
+                                    else
+                                    {
+                                        myTrade.Volume = item.fillSz.ToDecimal();
+                                    }
+                                }
+                            }
+
+                            if (!item.fillPx.Equals(String.Empty))
+                            {
+                                myTrade.Price = item.fillPx.ToDecimal();
+                            }
+
+                            myTrade.Side = item.side.Equals("buy") ? Side.Buy : Side.Sell;
+
+                            myTrades.Add(myTrade);
+                        }
+
+                        return myTrades;
+                    }
+                    else
+                    {
+                        SendLogMessage($"Get my trades by security error: {quotes.code} || {quotes.msg}", LogMessageType.Error);
+                    }
                 }
-
-                TradeDetailsResponse quotes = JsonConvert.DeserializeAnonymousType(contentStr, new TradeDetailsResponse());
-
-                if (quotes == null ||
-                    quotes.data == null ||
-                    quotes.data.Count == 0)
+                else
                 {
-                    Thread.Sleep(500 * CountOfCalls);
-
-                    CountOfCalls++;
-
-                    return GenerateTradesToOrder(order, CountOfCalls);
+                    SendLogMessage($"Get my trades by security error: {res.StatusCode} || {contentStr}", LogMessageType.Error);
                 }
-
-                CreateListTrades(myTrades, quotes);
-
-                return myTrades;
             }
             catch (Exception ex)
             {
                 SendLogMessage($"GenerateTradesToOrder - {ex.Message}", LogMessageType.Error);
-                return null;
+
             }
-        }
-
-        private void CreateListTrades(List<MyTrade> myTrades, TradeDetailsResponse quotes)
-        {
-            for (int i = 0; i < quotes.data.Count; i++)
-            {
-                TradeDetailsObject item = quotes.data[i];
-
-                MyTrade myTrade = new MyTrade();
-
-                myTrade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(item.ts));
-                myTrade.NumberOrderParent = item.ordId.ToString();
-                myTrade.NumberTrade = item.tradeId.ToString();
-
-                if (string.IsNullOrEmpty(item.fee))
-                {
-                    myTrade.Volume = item.fillSz.ToDecimal();
-                }
-                else
-                {// there is a commission
-                    if (item.instId.StartsWith(item.feeCcy))
-                    { // the commission is taken in the traded currency, not in the exchange currency
-                        myTrade.Volume = item.fillSz.ToDecimal() + item.fee.ToDecimal();
-                    }
-                    else
-                    {
-                        myTrade.Volume = item.fillSz.ToDecimal();
-                    }
-                }
-
-                if (!item.fillPx.Equals(String.Empty))
-                {
-                    myTrade.Price = item.fillPx.ToDecimal();
-                }
-
-                myTrade.SecurityNameCode = item.instId;
-                myTrade.Side = item.side.Equals("buy") ? Side.Buy : Side.Sell;
-
-                myTrades.Add(myTrade);
-            }
+            return null;
         }
 
         public void ChangeOrderPrice(Order order, decimal newPrice)
@@ -3241,61 +3302,72 @@ namespace OsEngine.Market.Servers.OKX
 
             try
             {
-                string url = $"{_baseUrl}/api/v5/trade/orders-history?instType={instType}";
+                string url = $"{_baseUrl}/api/v5/trade/orders-history?instType={instType}&limit=50";
                 HttpResponseMessage res = GetPrivateRequest(url);
                 string contentStr = res.Content.ReadAsStringAsync().Result;
 
-                if (res.StatusCode != HttpStatusCode.OK)
+                if (res.StatusCode == HttpStatusCode.OK)
                 {
-                    SendLogMessage($"GetActivOrders - {contentStr}", LogMessageType.Error);
-                    return;
-                }
+                    ResponseRestMessage<List<ResponseWsOrders>> OrderResponse = JsonConvert.DeserializeAnonymousType(contentStr, new ResponseRestMessage<List<ResponseWsOrders>>());
 
-                ResponseWsMessageAction<List<ResponseWsOrders>> OrderResponse = JsonConvert.DeserializeAnonymousType(contentStr, new ResponseWsMessageAction<List<ResponseWsOrders>>());
-
-                List<Order> orders = new List<Order>();
-
-                for (int i = 0; i < OrderResponse.data.Count; i++)
-                {
-                    Order newOrder = null;
-
-                    if ((OrderResponse.data[i].ordType.Equals("limit") ||
-                        OrderResponse.data[i].ordType.Equals("market")))
+                    if (OrderResponse.code.Equals("0"))
                     {
-                        newOrder = OrderUpdate(OrderResponse.data[i]);
-                    }
+                        List<Order> orders = new List<Order>();
 
-                    if (newOrder == null)
-                    {
-                        continue;
-                    }
-
-                    orders.Add(newOrder);
-                }
-
-                if (orders.Count > 0)
-                {
-                    array.AddRange(orders);
-
-                    if (array.Count > maxCount)
-                    {
-                        while (array.Count > maxCount)
+                        for (int i = 0; i < OrderResponse.data.Count; i++)
                         {
-                            array.RemoveAt(array.Count - 1);
+                            Order newOrder = null;
+
+                            if ((OrderResponse.data[i].ordType.Equals("limit") ||
+                                OrderResponse.data[i].ordType.Equals("market")))
+                            {
+                                newOrder = OrderUpdate(OrderResponse.data[i]);
+                            }
+
+                            if (newOrder == null)
+                            {
+                                continue;
+                            }
+
+                            orders.Add(newOrder);
                         }
+
+                        if (orders.Count > 0)
+                        {
+                            array.AddRange(orders);
+
+                            if (array.Count > maxCount)
+                            {
+                                while (array.Count > maxCount)
+                                {
+                                    array.RemoveAt(array.Count - 1);
+                                }
+                                return;
+                            }
+                            else if (array.Count < 100)
+                            {
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            return;
+                        }
+
                         return;
                     }
-                    else if (array.Count < 50)
+                    else
                     {
+                        SendLogMessage($"Get all historical orders request error. {OrderResponse.code} || {OrderResponse.msg}", LogMessageType.Error);
                         return;
                     }
+
                 }
                 else
                 {
+                    SendLogMessage($"Get all historical orders request error. Code: {res.StatusCode} || {contentStr}", LogMessageType.Error);
                     return;
                 }
-
-                return;
             }
             catch (Exception ex)
             {
@@ -3307,8 +3379,6 @@ namespace OsEngine.Market.Servers.OKX
         #endregion
 
         #region 12 Queries
-
-        HttpClient _httpClient = new HttpClient();
 
         public HttpResponseMessage GetPrivateRequest(string url)
         {

@@ -35,7 +35,7 @@ namespace OsEngine.Entity
             UpdateClassComboBox(server.Securities);
 
             CreateTable();
-          
+
             ComboBoxClass.SelectionChanged += ComboBoxClass_SelectionChanged;
             PaintSecurities(server.Securities);
 
@@ -68,7 +68,11 @@ namespace OsEngine.Entity
                 _server = null;
 
                 _gridSecurities.CellValueChanged -= _grid_CellValueChanged;
+                _gridSecurities.DataError -= _gridSecurities_DataError;
                 DataGridFactory.ClearLinks(_gridSecurities);
+                _gridSecurities.Columns.Clear();
+                _gridSecurities.DataSource = null;
+                _gridSecurities.Dispose();
                 _gridSecurities = null;
                 HostSecurities.Child = null;
 
@@ -293,10 +297,17 @@ namespace OsEngine.Entity
 
             DataGridViewColumn column14 = new DataGridViewColumn();
             column14.CellTemplate = cell0;
-            column14.HeaderText = OsLocalization.Entity.SecuritiesColumn15; // Collateral / ру: ГО
+            column14.HeaderText = OsLocalization.Entity.SecuritiesColumn15; // Collateral / ру: ГО ЛОНГ
             column14.ReadOnly = false;
             column14.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             _gridSecurities.Columns.Add(column14);
+
+            DataGridViewColumn column14_2 = new DataGridViewColumn();
+            column14_2.CellTemplate = cell0;
+            column14_2.HeaderText = OsLocalization.Entity.SecuritiesColumn22; // Collateral / ру: ГО ШОРТ
+            column14_2.ReadOnly = false;
+            column14_2.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            _gridSecurities.Columns.Add(column14_2);
 
             DataGridViewColumn column15 = new DataGridViewColumn();
             column15.CellTemplate = cell0;
@@ -323,7 +334,12 @@ namespace OsEngine.Entity
             HostSecurities.Child.Show();
             HostSecurities.Child.Refresh();
             _gridSecurities.CellValueChanged += _grid_CellValueChanged;
+            _gridSecurities.DataError += _gridSecurities_DataError;
+        }
 
+        private void _gridSecurities_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        {
+            ServerMaster.SendNewLogMessage(e.ToString(), Logging.LogMessageType.Error);
         }
 
         void _grid_CellValueChanged(object sender, DataGridViewCellEventArgs e)
@@ -332,7 +348,7 @@ namespace OsEngine.Entity
             {
                 SaveFromTable(e.RowIndex);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 ServerMaster.SendNewLogMessage(ex.ToString(), Logging.LogMessageType.Error);
             }
@@ -369,10 +385,11 @@ namespace OsEngine.Entity
             // 13 Volume step
             // 14 Price limit High
             // 15 Price limit Low
-            // 16 Collateral
-            // 17 Option type
-            // 18 Strike
-            // 19 Expiration
+            // 16 Collateral buy
+            // 17 Collateral sell
+            // 18 Option type
+            // 19 Strike
+            // 20 Expiration
 
             try
             {
@@ -467,26 +484,29 @@ namespace OsEngine.Entity
                     nRow.Cells[15].Value = curSec.PriceLimitLow.ToStringWithNoEndZero();
 
                     nRow.Cells.Add(new DataGridViewTextBoxCell());
-                    nRow.Cells[16].Value = curSec.Go.ToStringWithNoEndZero();
+                    nRow.Cells[16].Value = curSec.MarginBuy.ToStringWithNoEndZero();
 
                     nRow.Cells.Add(new DataGridViewTextBoxCell());
-                    nRow.Cells[17].Value = curSec.OptionType;
+                    nRow.Cells[17].Value = curSec.MarginSell.ToStringWithNoEndZero();
+
+                    nRow.Cells.Add(new DataGridViewTextBoxCell());
+                    nRow.Cells[18].Value = curSec.OptionType;
 
                     nRow.Cells.Add(new DataGridViewTextBoxCell());
                     if (curSec.OptionType != OptionType.None)
                     {
-                        nRow.Cells[18].Value = curSec.Strike.ToStringWithNoEndZero();
+                        nRow.Cells[19].Value = curSec.Strike.ToStringWithNoEndZero();
                     }
                     else
                     {
-                        nRow.Cells[18].ReadOnly = true;
+                        nRow.Cells[19].ReadOnly = true;
                     }
 
                     nRow.Cells.Add(new DataGridViewTextBoxCell());
 
                     if (curSec.Expiration != DateTime.MinValue)
                     {
-                        nRow.Cells[19].Value = curSec.Expiration.ToString(OsLocalization.CurCulture);
+                        nRow.Cells[20].Value = curSec.Expiration.ToString(OsLocalization.CurCulture);
                     }
 
                     rows.Add(nRow);
@@ -496,7 +516,7 @@ namespace OsEngine.Entity
 
                 _gridSecurities.Rows.Clear();
 
-                if(rows.Count > 0)
+                if (rows.Count > 0)
                 {
                     _gridSecurities.Rows.AddRange(rows.ToArray());
                 }
@@ -531,10 +551,11 @@ namespace OsEngine.Entity
             // 13 Volume step
             // 14 Price limit High
             // 15 Price limit Low
-            // 16 Collateral
-            // 17 Option type
-            // 18 Strike
-            // 19 Expiration
+            // 16 Collateral buy
+            // 17 Collateral sell
+            // 18 Option type
+            // 19 Strike
+            // 20 Expiration
 
             List<Security> securities = _server.Securities;
 
@@ -556,30 +577,31 @@ namespace OsEngine.Entity
             int priceDecimals = Convert.ToInt32(row.Cells[9].Value);
             int volumeDecimals = Convert.ToInt32(row.Cells[10].Value);
             MinTradeAmountType minVolumeType;
-            Enum.TryParse(row.Cells[11].Value.ToString(),out minVolumeType);
+            Enum.TryParse(row.Cells[11].Value.ToString(), out minVolumeType);
             decimal minVolume = row.Cells[12].Value.ToString().ToDecimal();
             decimal volumeStep = row.Cells[13].Value.ToString().ToDecimal();
             decimal priceLimitHigh = row.Cells[14].Value.ToString().ToDecimal();
             decimal priceLimitLow = row.Cells[15].Value.ToString().ToDecimal();
-            decimal collateral = row.Cells[16].Value.ToString().ToDecimal();
+            decimal collateralMarginBuy = row.Cells[16].Value.ToString().ToDecimal();
+            decimal collateralMarginSell = row.Cells[17].Value.ToString().ToDecimal();
 
             // 15 Option type
 
             decimal strike = 0;
 
-            if (row.Cells[18].Value != null)
+            if (row.Cells[19].Value != null)
             {
-                strike = row.Cells[18].Value.ToString().ToDecimal();
+                strike = row.Cells[19].Value.ToString().ToDecimal();
             }
             // 17 Expiration
 
             Security mySecurity = null;
 
-            for(int i = 0;i < securities.Count;i++)
+            for (int i = 0; i < securities.Count; i++)
             {
                 if (securities[i].Name == secName
-                    && securities[i].NameFull == secFullName 
-                    && securities[i].NameId == secId 
+                    && securities[i].NameFull == secFullName
+                    && securities[i].NameId == secId
                     && securities[i].NameClass == secClass
                     && securities[i].SecurityType.ToString() == secType)
                 {
@@ -588,7 +610,7 @@ namespace OsEngine.Entity
                 }
             }
 
-            if(mySecurity == null)
+            if (mySecurity == null)
             {
                 return;
             }
@@ -602,11 +624,12 @@ namespace OsEngine.Entity
             mySecurity.MinTradeAmount = minVolume;
             mySecurity.PriceLimitHigh = priceLimitHigh;
             mySecurity.PriceLimitLow = priceLimitLow;
-            mySecurity.Go = collateral;
+            mySecurity.MarginBuy = collateralMarginBuy;
+            mySecurity.MarginSell = collateralMarginSell;
             mySecurity.Strike = strike;
             mySecurity.VolumeStep = volumeStep;
 
-            if(Directory.Exists(@"Engine\ServerDopSettings") == false)
+            if (Directory.Exists(@"Engine\ServerDopSettings") == false)
             {
                 Directory.CreateDirectory(@"Engine\ServerDopSettings");
             }
@@ -618,7 +641,7 @@ namespace OsEngine.Entity
 
             string fileName = mySecurity.Name.RemoveExcessFromSecurityName();
 
-            if(string.IsNullOrEmpty(mySecurity.NameId) == false)
+            if (string.IsNullOrEmpty(mySecurity.NameId) == false)
             {
                 fileName += "_" + mySecurity.NameId.RemoveExcessFromSecurityName();
             }
@@ -629,9 +652,9 @@ namespace OsEngine.Entity
             }
 
             fileName += "_" + mySecurity.SecurityType.ToString().RemoveExcessFromSecurityName();
-            
 
-            string filePath = @"Engine\ServerDopSettings\" + _server.ServerType +"\\" + fileName + ".txt";
+
+            string filePath = @"Engine\ServerDopSettings\" + _server.ServerType + "\\" + fileName + ".txt";
 
             try
             {
@@ -645,7 +668,7 @@ namespace OsEngine.Entity
             }
             catch (Exception)
             {
-                
+
             }
         }
 
@@ -754,15 +777,15 @@ namespace OsEngine.Entity
                         }
 
                         _searchResults.Add(i);
-                    }					
+                    }
                 }
-				
+
                 if (_searchResults.Count > 1 && _searchResults.Contains(indexFirstSec) && _searchResults.IndexOf(indexFirstSec) != 0)
                 {
                     int index = _searchResults.IndexOf(indexFirstSec);
                     _searchResults.RemoveAt(index);
                     _searchResults.Insert(0, indexFirstSec);
-                }							
+                }
             }
             catch (Exception ex)
             {

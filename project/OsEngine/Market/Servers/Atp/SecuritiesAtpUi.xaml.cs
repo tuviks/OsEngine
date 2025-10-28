@@ -55,6 +55,7 @@ namespace OsEngine.Market.Servers.Atp
             Closed -= SecuritiesUi_Closed;
 
             _grid.CellClick -= _grid_CellClick;
+            _grid.DataError -= _grid_DataError;
             DataGridFactory.ClearLinks(_grid);
             _grid = null;
             HostSecurities.Child = null;
@@ -72,6 +73,12 @@ namespace OsEngine.Market.Servers.Atp
             HostSecurities.Child.Show();
             HostSecurities.Child.Refresh();
             _grid.CellClick += _grid_CellClick;
+            _grid.DataError += _grid_DataError;
+        }
+
+        private void _grid_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        {
+            ServerMaster.SendNewLogMessage(e.ToString(), Logging.LogMessageType.Error);
         }
 
         public static DataGridView GetDataGridSecurities()
@@ -287,7 +294,7 @@ namespace OsEngine.Market.Servers.Atp
 
             nRow.Cells.Add(new DataGridViewTextBoxCell());
             nRow.Cells[6].ReadOnly = false;
-            nRow.Cells[6].Value = security.Go;// 6 lot price
+            nRow.Cells[6].Value = security.MarginBuy;// 6 lot price
 
             nRow.Cells.Add(new DataGridViewTextBoxCell());
             nRow.Cells[7].ReadOnly = false;
@@ -479,7 +486,7 @@ namespace OsEngine.Market.Servers.Atp
 
             try
             {
-                newSec.Go = row.Cells[6].Value.ToString().ToDecimal();
+                newSec.MarginBuy = row.Cells[6].Value.ToString().ToDecimal();
             }
             catch
             {

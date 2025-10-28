@@ -175,7 +175,13 @@ namespace OsEngine.Market.Servers.KuCoin.KuCoinSpot
 
         public string[] ManuallyClosePositionOnBoard_ExceptionPositionNames
         {
-            get { return null; }
+            get
+            {
+                return new string[]
+                {
+                    "USDT"
+                };
+            }
         }
 
         public bool ManuallyClosePositionOnBoard_IsOn
@@ -194,6 +200,11 @@ namespace OsEngine.Market.Servers.KuCoin.KuCoinSpot
         }
 
         public bool CanGetOrderLists
+        {
+            get { return false; }
+        }
+
+        public bool HaveOnlyMakerLimitsRealization
         {
             get { return false; }
         }

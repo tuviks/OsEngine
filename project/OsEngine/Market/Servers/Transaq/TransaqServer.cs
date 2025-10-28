@@ -648,7 +648,11 @@ namespace OsEngine.Market.Servers.Transaq
 
                         if (string.IsNullOrEmpty(secInfo.Buy_deposit) == false)
                         {
-                            secCur.Go = secInfo.Buy_deposit.ToDecimal();
+                            secCur.MarginBuy = secInfo.Buy_deposit.ToDecimal();
+                        }
+                        if (string.IsNullOrEmpty(secInfo.Sell_deposit) == false)
+                        {
+                            secCur.MarginSell = secInfo.Sell_deposit.ToDecimal();
                         }
 
                         break;
@@ -711,6 +715,7 @@ namespace OsEngine.Market.Servers.Transaq
                         if (securityData.Sectype == "FUT")
                         {
                             security.SecurityType = SecurityType.Futures;
+                            security.UsePriceStepCostToCalculateVolume = true;
                         }
                         else if (securityData.Sectype == "SHARE")
                         {
@@ -719,6 +724,7 @@ namespace OsEngine.Market.Servers.Transaq
                         else if (securityData.Sectype == "OPT")
                         {
                             security.SecurityType = SecurityType.Option;
+                            security.UsePriceStepCostToCalculateVolume = true;
                         }
                         else if (securityData.Sectype == "BOND")
                         {
@@ -739,10 +745,12 @@ namespace OsEngine.Market.Servers.Transaq
                         {
                             security.NameClass = "MCT_put_call";
                             security.SecurityType = SecurityType.Option;
+                            security.UsePriceStepCostToCalculateVolume = true;
                         }
                         else if (security.NameClass == "MCT")
                         {
                             security.SecurityType = SecurityType.Futures;
+                            security.UsePriceStepCostToCalculateVolume = true;
                         }
                         else if (security.NameClass == "QUOTES")
                         {

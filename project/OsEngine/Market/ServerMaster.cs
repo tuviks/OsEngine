@@ -43,6 +43,7 @@ using OsEngine.Market.Servers.BingX.BingXSpot;
 using OsEngine.Market.Servers.BingX.BingXFutures;
 using OsEngine.Market.Servers.Deribit;
 using OsEngine.Market.Servers.XT.XTSpot;
+using OsEngine.Market.Servers.XT.XTFutures;
 using OsEngine.Market.Servers.Pionex;
 using OsEngine.Market.Servers.Woo;
 using OsEngine.Market.Servers.MoexAlgopack;
@@ -82,8 +83,9 @@ using System.Windows.Controls;
 using OsEngine.Market.Servers.ExMo.ExmoSpot;
 using OsEngine.Market.Servers.BybitData;
 using OsEngine.Market.Servers.Entity;
-using System.Threading;
-using OsEngine.OsTrader.ClientManagement;
+using OsEngine.Market.Servers.GateIoData;
+using OsEngine.Market.Servers.BitGetData;
+using OsEngine.Market.Servers.MetaTrader5;
 
 namespace OsEngine.Market
 {
@@ -249,6 +251,30 @@ namespace OsEngine.Market
             }
         }
 
+        public static void SaveServerInstanceByType(ServerType serverType)
+        {
+            try
+            {
+                List<AServer> serversArray = new List<AServer>();
+
+                List<IServer> servers = ServerMaster.GetServers();
+
+                for (int i = 0; i < servers.Count; i++)
+                {
+                    if (servers[i].ServerType == serverType)
+                    {
+                        serversArray.Add((AServer)servers[i]);
+                    }
+                }
+
+                TrySaveServerInstance(serversArray);
+            }
+            catch (Exception ex)
+            {
+                SendNewLogMessage(ex.ToString(), LogMessageType.Error);
+            }
+        }
+
         #endregion
 
         #region Creating and storing servers
@@ -270,11 +296,11 @@ namespace OsEngine.Market
 
                 serverTypes.Add(ServerType.Alor);
                 serverTypes.Add(ServerType.QuikLua);
+                serverTypes.Add(ServerType.MetaTrader5);
                 serverTypes.Add(ServerType.Plaza);
                 serverTypes.Add(ServerType.Transaq);
                 serverTypes.Add(ServerType.TInvest);
                 serverTypes.Add(ServerType.Finam);
-                serverTypes.Add(ServerType.FinamGrpc);
                 serverTypes.Add(ServerType.MoexDataServer);
                 serverTypes.Add(ServerType.MfdWeb);
                 serverTypes.Add(ServerType.MoexAlgopack);
@@ -305,6 +331,7 @@ namespace OsEngine.Market
                 serverTypes.Add(ServerType.BingXSpot);
                 serverTypes.Add(ServerType.BingXFutures);
                 serverTypes.Add(ServerType.XTSpot);
+                serverTypes.Add(ServerType.XTFutures);
                 serverTypes.Add(ServerType.PionexSpot);
                 serverTypes.Add(ServerType.Woo);
                 serverTypes.Add(ServerType.BitMartSpot);
@@ -416,12 +443,12 @@ namespace OsEngine.Market
                 List<ServerType> serverTypes = new List<ServerType>();
 
                 serverTypes.Add(ServerType.TInvest);
-                serverTypes.Add(ServerType.XTSpot);
+                serverTypes.Add(ServerType.XTSpot); 
+                serverTypes.Add(ServerType.XTFutures);
                 serverTypes.Add(ServerType.Deribit);
                 serverTypes.Add(ServerType.KuCoinSpot);
                 serverTypes.Add(ServerType.Alor);
                 serverTypes.Add(ServerType.Finam);
-                serverTypes.Add(ServerType.FinamGrpc);
                 serverTypes.Add(ServerType.MoexDataServer);
                 serverTypes.Add(ServerType.MfdWeb);
                 serverTypes.Add(ServerType.MoexAlgopack);
@@ -436,7 +463,6 @@ namespace OsEngine.Market
                 serverTypes.Add(ServerType.HTXFutures);
                 serverTypes.Add(ServerType.HTXSwap);
                 serverTypes.Add(ServerType.Bybit);
-                serverTypes.Add(ServerType.OKX);
                 serverTypes.Add(ServerType.Woo);
                 serverTypes.Add(ServerType.BitGetSpot);
                 serverTypes.Add(ServerType.BitGetFutures);
@@ -450,6 +476,8 @@ namespace OsEngine.Market
                 serverTypes.Add(ServerType.AscendexSpot);
                 serverTypes.Add(ServerType.OKXData);
                 serverTypes.Add(ServerType.BybitData);
+                serverTypes.Add(ServerType.GateIoData);
+                serverTypes.Add(ServerType.BitGetData);
 
                 return serverTypes;
             }
@@ -586,6 +614,14 @@ namespace OsEngine.Market
 
                     SaveMostPopularServers(type);
 
+                    if (type == ServerType.BitGetData)
+                    {
+                        newServer = new BitGetDataServer();
+                    }
+                    if (type == ServerType.GateIoData)
+                    {
+                        newServer = new GateIoDataServer();
+                    }
                     if (type == ServerType.BybitData)
                     {
                         newServer = new BybitDataServer();
@@ -641,6 +677,10 @@ namespace OsEngine.Market
                     else if (type == ServerType.XTSpot)
                     {
                         newServer = new XTServerSpot(uniqueNum);
+                    }
+                    else if (type == ServerType.XTFutures)
+                    {
+                        newServer = new XTFuturesServer(uniqueNum);
                     }
                     else if (type == ServerType.BingXFutures)
                     {
@@ -730,6 +770,10 @@ namespace OsEngine.Market
                     {
                         newServer = new QuikLuaServer();
                     }
+                    else if (type == ServerType.MetaTrader5)
+                    {
+                        newServer = new MetaTrader5Server();
+                    }
                     else if (type == ServerType.InteractiveBrokers)
                     {
                         newServer = new InteractiveBrokersServer();
@@ -749,10 +793,6 @@ namespace OsEngine.Market
                     else if (type == ServerType.Finam)
                     {
                         newServer = new FinamServer();
-                    }
-                    else if (type == ServerType.FinamGrpc)
-                    {
-                        newServer = new FinamGrpcServer(uniqueNum);
                     }
                     else if (type == ServerType.Deribit)
                     {
@@ -860,11 +900,6 @@ namespace OsEngine.Market
         {
             try
             {
-                if (uniqueNum < 1)
-                {
-                    return;
-                }
-
                 lock (_serversArrayLocker)
                 {
                     for (int i = 0; i < _servers.Count; i++)
@@ -876,6 +911,14 @@ namespace OsEngine.Market
                             if (serverCurrent.ServerType == type
                                 && serverCurrent.ServerNum == uniqueNum)
                             {
+                                if (uniqueNum < 1)
+                                {
+                                    // стандартный сервер под номером 0. Удалять нельзя
+                                    // отключаем
+                                    serverCurrent.StopServer();
+                                    return;
+                                }
+
                                 serverCurrent.StopServer();
                                 serverCurrent.Delete();
 
@@ -895,15 +938,17 @@ namespace OsEngine.Market
 
                                 SendNewLogMessage(OsLocalization.Market.Label245 + ": " + serverCurrent.ServerNameAndPrefix, LogMessageType.System);
 
-                                return;
+                                break;
                             }
                         }
                     }
+
+                    SaveServerInstanceByType(type);
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                SendNewLogMessage(ex.ToString(),LogMessageType.Error);
+                SendNewLogMessage(ex.ToString(), LogMessageType.Error);
             }
         }
 
@@ -1393,6 +1438,10 @@ namespace OsEngine.Market
                 {
                     serverPermission = new QuikLuaServerPermission();
                 }
+                else if (type == ServerType.MetaTrader5)
+                {
+                    serverPermission = new MetaTrader5ServerPermission();
+                }
                 else if (type == ServerType.Atp)
                 {
                     serverPermission = new AtpServerPermission();
@@ -1409,9 +1458,13 @@ namespace OsEngine.Market
                 {
                     serverPermission = new MoexFixFastSpotServerPermission();
                 }
-                else if (type == ServerType.XTSpot)
+                else if (type == ServerType.XTSpot) 
                 {
                     serverPermission = new XTSpotServerPermission();
+                }
+                else if (type == ServerType.XTFutures)
+                { 
+                    serverPermission = new XTFuturesServerPermission();
                 }
                 else if (type == ServerType.Transaq)
                 {
@@ -1468,10 +1521,6 @@ namespace OsEngine.Market
                 else if (type == ServerType.Finam)
                 {
                     serverPermission = new FinamServerPermission();
-                }
-                else if (type == ServerType.FinamGrpc)
-                {
-                    serverPermission = new FinamGrpcServerPermission();
                 }
                 else if (type == ServerType.TInvest)
                 {
@@ -1608,6 +1657,14 @@ namespace OsEngine.Market
                 else if (type == ServerType.BybitData)
                 {
                     serverPermission = new BybitDataServerPermission();
+                }
+                else if (type == ServerType.GateIoData)
+                {
+                    serverPermission = new GateIoDataServerPermission();
+                }
+                else if (type == ServerType.BitGetData)
+                {
+                    serverPermission = new BitGetDataServerPermission();
                 }
 
                 if (serverPermission != null)
@@ -1963,7 +2020,17 @@ namespace OsEngine.Market
             }
         }
 
+        public static void ShowClientManagerDialog()
+        {
+            if (ShowClientManagerDialogEvent != null)
+            {
+                ShowClientManagerDialogEvent();
+            }
+        }
+
         public static event Action ShowApiDialogEvent;
+
+        public static event Action ShowClientManagerDialogEvent;
 
         #endregion
 
@@ -1988,326 +2055,6 @@ namespace OsEngine.Market
             }
 
             return null;
-        }
-
-        #endregion
-
-        #region External server creation and getters
-
-        public static AServer GetServerOrCreate(TradeClientConnector description, out string error)
-        {
-            if(description.ServerType == ServerType.None)
-            {
-                error = "Server type is None";
-                return null;
-            }
-
-            if (description.ServerParameters.Count == 0)
-            {
-                error = "Server parameters count is zero";
-                return null;
-            }
-
-            error = "";
-
-            AServer resultServer = null;
-
-            ServerType typeServer = description.ServerType;
-
-            ServerMaster.TryLoadServerInstance(typeServer);
-
-            // 1 сначала пытаемся взять сервер из уже ранее созданных
-
-            List<AServer> myServers = ServerMaster.GetAServers();
-
-            for (int i = 0; myServers != null && i < myServers.Count; i++)
-            {
-                AServer myServer = myServers[i];
-
-                if (myServer.ServerType != typeServer)
-                {
-                    continue;
-                }
-
-                List<IServerParameter> parameters = myServer.ServerParameters;
-
-                if (IsMyServer(parameters, description.ServerParameters))
-                {
-                    resultServer = myServer;
-
-                    return resultServer;
-                }
-            }
-
-            // 2 выясняем номер сервера, который дадим серверу
-
-            int serverNum = 0;
-
-            for (int i = 0; myServers != null && i < myServers.Count; i++)
-            {
-                if (myServers[i].ServerNum >= serverNum)
-                {
-                    serverNum = myServers[i].ServerNum + 1;
-                }
-            }
-
-            // 3 создаём сервер
-
-            ServerMaster.CreateServer(typeServer, false, serverNum);
-
-            myServers = ServerMaster.GetAServers();
-
-            for (int i = 0; myServers != null && i < myServers.Count; i++)
-            {
-                if (myServers[i].ServerNum == serverNum)
-                {
-                    resultServer = myServers[i];
-                }
-            }
-
-            if (resultServer == null)
-            {
-                error = "Can`t create server. Type: " + description.ServerType;
-                SendNewLogMessage(error, LogMessageType.Error);
-                return null;
-            }
-
-            // 4 проверяем наличие всех параметров, которые передал сигнал
-
-            for (int i = 0; i < description.ServerParameters.Count; i++)
-            {
-                TradeClientConnectorParameter parameterD = description.ServerParameters[i];
-                bool isInArray = false;
-
-                for (int j = 0; j < resultServer.ServerParameters.Count; j++)
-                {
-                    IServerParameter parameter = resultServer.ServerParameters[j];
-
-                    if (parameter.Name == parameterD.ParameterName)
-                    {
-                        isInArray = true;
-                        break;
-                    }
-                }
-
-                if (isInArray == false)
-                {
-                    error = "Can`t find parameter in server. Parameter name: " + parameterD.ParameterName
-                        + " Parameter value: " + parameterD.ParameterValue;
-
-                    SendNewLogMessage(error, LogMessageType.Error);
-                    ServerMaster.DeleteServer(resultServer.ServerType, resultServer.ServerNum);
-                    return null;
-                }
-            }
-
-            // 5 подгружаем в сервер параметры
-
-            try
-            {
-                SetParametersInServer(resultServer, description.ServerParameters);
-            }
-            catch (Exception ex)
-            {
-                error = "Error on set parameters in server step. Exception: " + ex.ToString();
-
-                SendNewLogMessage(error, LogMessageType.Error);
-                ServerMaster.DeleteServer(resultServer.ServerType, resultServer.ServerNum);
-                return null;
-            }
-
-            return resultServer;
-        }
-
-        public static AServer GetServer(TradeClientConnector description, out string error)
-        {
-            AServer resultServer = null;
-
-            ServerType typeServer = description.ServerType;
-
-            ServerMaster.TryLoadServerInstance(typeServer);
-
-            // 1 сначала пытаемся взять сервер из уже ранее созданных
-
-            List<AServer> myServers = ServerMaster.GetAServers();
-
-            for (int i = 0; myServers != null && i < myServers.Count; i++)
-            {
-                AServer myServer = myServers[i];
-
-                if (myServer.ServerType != typeServer)
-                {
-                    continue;
-                }
-
-                List<IServerParameter> parameters = myServer.ServerParameters;
-
-                if (IsMyServer(parameters, description.ServerParameters))
-                {
-                    resultServer = myServer;
-
-                    error = "";
-                    return resultServer;
-                }
-            }
-
-            error = "No server with this params";
-            return resultServer;
-        }
-
-        private static bool IsMyServer(List<IServerParameter> parametersServer,
-    List<TradeClientConnectorParameter> parametersDescription)
-        {
-            for (int i = 0; i < parametersDescription.Count; i++)
-            {
-                TradeClientConnectorParameter parameterD = parametersDescription[i];
-
-                bool isInArray = false;
-
-                for (int j = 0; j < parametersServer.Count; j++)
-                {
-                    IServerParameter serverParameter = parametersServer[j];
-
-                    if (serverParameter.Name == parameterD.ParameterName)
-                    {
-                        if (serverParameter.Type == ServerParameterType.Bool)
-                        {
-                            ServerParameterBool serverParameterRealization = (ServerParameterBool)serverParameter;
-
-                            if (serverParameterRealization.Value ==
-                                Convert.ToBoolean(parameterD.ParameterValue))
-                            {
-                                isInArray = true;
-                                break;
-                            }
-                        }
-                        else if (serverParameter.Type == ServerParameterType.String)
-                        {
-                            ServerParameterString serverParameterRealization = (ServerParameterString)serverParameter;
-
-                            if (serverParameterRealization.Value ==
-                                parameterD.ParameterValue)
-                            {
-                                isInArray = true;
-                                break;
-                            }
-                        }
-                        else if (serverParameter.Type == ServerParameterType.Password)
-                        {
-                            ServerParameterPassword serverParameterRealization = (ServerParameterPassword)serverParameter;
-
-                            if (serverParameterRealization.Value ==
-                                parameterD.ParameterValue)
-                            {
-                                isInArray = true;
-                                break;
-                            }
-                        }
-                        else if (serverParameter.Type == ServerParameterType.Int)
-                        {
-                            ServerParameterInt serverParameterRealization = (ServerParameterInt)serverParameter;
-
-                            if (serverParameterRealization.Value.ToString() ==
-                                parameterD.ParameterValue)
-                            {
-                                isInArray = true;
-                                break;
-                            }
-                        }
-                        else if (serverParameter.Type == ServerParameterType.Decimal)
-                        {
-                            ServerParameterDecimal serverParameterRealization = (ServerParameterDecimal)serverParameter;
-
-                            if (serverParameterRealization.Value ==
-                                parameterD.ParameterValue.ToDecimal())
-                            {
-                                isInArray = true;
-                                break;
-                            }
-                        }
-                        else if (serverParameter.Type == ServerParameterType.Enum)
-                        {
-                            ServerParameterEnum serverParameterRealization = (ServerParameterEnum)serverParameter;
-
-                            if (serverParameterRealization.Value ==
-                                parameterD.ParameterValue)
-                            {
-                                isInArray = true;
-                                break;
-                            }
-                        }
-                    }
-
-                }
-
-                if (isInArray == false)
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private static void SetParametersInServer(AServer server, List<TradeClientConnectorParameter> parametersDescription)
-        {
-            List<IServerParameter> parametersServer = server.ServerParameters;
-
-            for (int i = 0; i < parametersDescription.Count; i++)
-            {
-                TradeClientConnectorParameter parameterD = parametersDescription[i];
-
-                for (int j = 0; j < parametersServer.Count; j++)
-                {
-                    IServerParameter serverParameter = parametersServer[j];
-
-                    if (serverParameter.Name == parameterD.ParameterName)
-                    {
-                        if (serverParameter.Type == ServerParameterType.Bool)
-                        {
-                            ServerParameterBool serverParameterBool = (ServerParameterBool)serverParameter;
-                            serverParameterBool.Value = Convert.ToBoolean(parameterD.ParameterValue);
-
-                            break;
-                        }
-                        else if (serverParameter.Type == ServerParameterType.String)
-                        {
-                            ServerParameterString serverParameterRealization = (ServerParameterString)serverParameter;
-                            serverParameterRealization.Value = parameterD.ParameterValue;
-
-                            break;
-                        }
-                        else if (serverParameter.Type == ServerParameterType.Password)
-                        {
-                            ServerParameterPassword serverParameterRealization = (ServerParameterPassword)serverParameter;
-
-                            serverParameterRealization.Value = parameterD.ParameterValue;
-                            break;
-                        }
-                        else if (serverParameter.Type == ServerParameterType.Int)
-                        {
-                            ServerParameterInt serverParameterRealization = (ServerParameterInt)serverParameter;
-                            serverParameterRealization.Value = Convert.ToInt32(parameterD.ParameterValue);
-
-                            break;
-                        }
-                        else if (serverParameter.Type == ServerParameterType.Decimal)
-                        {
-                            ServerParameterDecimal serverParameterRealization = (ServerParameterDecimal)serverParameter;
-                            serverParameterRealization.Value = parameterD.ParameterValue.ToDecimal();
-
-                            break;
-                        }
-                        else if (serverParameter.Type == ServerParameterType.Enum)
-                        {
-                            ServerParameterEnum serverParameterRealization = (ServerParameterEnum)serverParameter;
-                            serverParameterRealization.Value = parameterD.ParameterValue;
-
-                            break;
-                        }
-                    }
-                }
-            }
         }
 
         #endregion
@@ -2380,6 +2127,12 @@ namespace OsEngine.Market
         /// подключение к Т-Инвестициям (версия 3 коннектора)
         /// </summary>
         TInvest,
+
+        /// <summary>
+        /// Connecting to different forex brokers via the MT5 terminal
+        /// Подключение к разным форекс брокерам через терминал МТ5
+        /// </summary>
+        MetaTrader5,
 
         /// <summary>
         /// cryptocurrency exchange Gate.io
@@ -2557,7 +2310,12 @@ namespace OsEngine.Market
         /// <summary>
         /// XT Spot exchange
         /// </summary>
-        XTSpot,
+        XTSpot, 
+
+            /// <summary>
+            /// XT Futures exchange
+            /// </summary>
+        XTFutures, 
 
         /// <summary>
         /// Pionex exchange
@@ -2704,6 +2462,18 @@ namespace OsEngine.Market
         /// downloading historical data from exchange Bybit
         /// скачивание исторических данных с биржи Bybit
         /// </summary>
-        BybitData
+        BybitData,
+
+        /// <summary>
+        /// downloading historical data from exchange GateIo
+        /// скачивание исторических данных с биржи GateIo
+        /// </summary>
+        GateIoData,
+
+        /// <summary>
+        /// downloading historical data from exchange BitGet
+        /// скачивание исторических данных с биржи BitGet
+        /// </summary>
+        BitGetData
     }
 }

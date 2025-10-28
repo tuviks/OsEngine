@@ -1042,17 +1042,57 @@ namespace OsEngine.Language
          "Ru:Устанавливаем кредитное плечо от 1 до максимально разрешенного биржей. Работает только для линейных фьючерсов. Если поле оставить пустым, то используется плечо, которое вы установили на бирже_");
 
         public string Label252 => OsLocalization.ConvertToLocString(
-        "Eng:If true, we request information on open interest, funding, volume24, and whether you use options. If you don't use this data, it's recommended to set it to false_" +
-        "Ru:Если true - то запрашиваем информацию по открытому интересу, фандингу, объему24 и если вы используйте опционы. Если вы не используйте эти данные, то рекомендуется установить false_");
+        "Eng:If True, we request information on open interest, funding, and volume24. It should also be true if you're using options. If you're not using this data, it's recommended to set it to False_" +
+        "Ru:Если True - то запрашиваем информацию по открытому интересу, фандингу, объему24. А так же должно быть true, если вы задействуете опционы. Если вы не используйте эти данные, то рекомендуется установить False_");
 
         public string Label253 => OsLocalization.ConvertToLocString(
-         "Eng:If true, we request options. If you don't use them, we recommend setting it to false_" +
-         "Ru:Если true - то запрашиваем опционы. Если вы их не используйте, то ремендуется установить false_");
+         "Eng:If True, we request options. If you don't use them, we recommend setting it to False_" +
+         "Ru:Если True - то запрашиваем опционы. Если вы их не используйте, то ремендуется установить False_");
 
+        public string Label254 => OsLocalization.ConvertToLocString(
+         "Eng:Selection of perpetual futures. USDT - USDT-M perpetual futures, where the stablecoin USDT is used as margin (collateral) and the currency for calculating profit and loss. COIN - COIN-M perpetual futures, where the underlying cryptocurrency (e.g., BTC or ETH) serves as both collateral and the currency for calculating profit and loss_" +
+         "Ru:Выбор бессрочных фьючерсов. USDT - бессрочные фьючерсы USDT-M, где в качестве маржи (залога) и валюты для расчета прибыли и убытков используется стейблкоин USDT. COIN - бессрочные фьючерсы COIN-M, где базовой криптовалютой (например, BTC или ETH) выступает и залог, и валюта расчета прибыли и убытков_");
 
+        public string Label255 => OsLocalization.ConvertToLocString(
+        "Eng:Select a hedging mode. If True, hedging mode is enabled; if False, one-way mode is enabled_" +
+        "Ru:Выбор режима хеджирования. Если True - то включен режим хеджирования, если False - включен односторонний режим_");
 
+        public string Label256 => OsLocalization.ConvertToLocString(
+         "Eng:Set leverage from 1 to the maximum allowed by the exchange_" +
+         "Ru:Устанавливаем кредитное плечо от 1 до максимально разрешенного биржей_");
 
+        public string Label257 => OsLocalization.ConvertToLocString(
+         "Eng:Enables or disables the netting mode. It is recommended to trade on accounts with the netting mode. By default, true_" +
+         "Ru:Включает или отключает режим неттинга. Рекомендуется торговать на счетах с режимом неттинг. По умолчанию true_");
 
+        public string Label258 => OsLocalization.ConvertToLocString(
+         "Eng:Upload papers only from market watch. True mode is recommended_" +
+         "Ru:Загружать бумаги только из обзора рынка. Рекомендуется использовать true_");
+
+        public string Label259 => OsLocalization.ConvertToLocString(
+         "Eng:Build a market depth from ticks. Some brokers do not provide a market depth, so the glass will be built from the bid and ask ticks._" +
+         "Ru:Строить стакан из тиков. Некоторые брокеры не предоставляют стакан, поэтому стакан будет строиться из тиков bid и ask_");
+
+        public string Label260 => OsLocalization.ConvertToLocString(
+         "Eng:The currency of the deposit in which the cost of the price step should be calculated_" +
+         "Ru:Валюта депозита в которой необходимо считать стоимость шага цены_");
+
+        public string Label261 => OsLocalization.ConvertToLocString(
+         "Eng:Count the cost of the price step in points. If the parameter is enabled, the cost will be calculated in points. If disabled, the profit will be calculated in the current deposit currency via the USD cross-rate. This parameter is important, so you need to make sure that the cost of the price step is calculated correctly!_" +
+         "Ru:Считать стоимость шага цены в пунктах. Если параметр включен, то стоимость будет считаться в пунктах. Если выключен, профит будет считаться в текущей валюте депозита через кросс-курс USD. Данный параметр важен, поэтому необходимо самостоятельно убедиться, что стоимость шага цены рассчитана правильно!_");
+
+        public string Label262 => OsLocalization.ConvertToLocString(
+         "Eng:Includes a currency trading platform_" +
+         "Ru:Включает площадку для торговли валютой_");
+        public string Label263 => OsLocalization.ConvertToLocString(
+         "Eng:Includes a platform for trading commodities_" +
+         "Ru:Включает площадку для торговли сырьевыми товарами_");
+        public string Label264 => OsLocalization.ConvertToLocString(
+         "Eng:Includes a platform for trading funds_" +
+         "Ru:Включает площадку для торговли фондами_");
+        public string Label265 => OsLocalization.ConvertToLocString(
+         "Eng:It includes a platform for trading other instruments, such as stocks._" +
+         "Ru:Включает площадку для торговли другими инструментами, например акциями_");
 
         public string LabelCommissionType => OsLocalization.ConvertToLocString(
             "Eng:Commission type_" +

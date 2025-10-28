@@ -17,6 +17,7 @@ using System.Threading;
 using System.Windows.Controls;
 using System.Windows.Forms.Integration;
 using System.Windows.Shapes;
+using OsEngine.Charts.CandleChart.Elements;
 
 namespace OsEngine.OsTrader.Panels.Tab
 {
@@ -263,8 +264,8 @@ namespace OsEngine.OsTrader.Panels.Tab
         {
             if(UiSecuritiesSelection == null)
             {
-                _creator = GetCurrentCreator();
-                UiSecuritiesSelection = new MassSourcesCreateUi(_creator);
+                Creator = GetCurrentCreator();
+                UiSecuritiesSelection = new MassSourcesCreateUi(Creator);
                 UiSecuritiesSelection.LogMessageEvent += SendNewLogMessage;
                 UiSecuritiesSelection.Closed += _uiSecuritiesSelection_Closed;
                 UiSecuritiesSelection.Show();
@@ -276,6 +277,35 @@ namespace OsEngine.OsTrader.Panels.Tab
             }
 
             return false;
+        }
+
+        public void SetNewSecuritiesList(List<ActivatedSecurity> securitiesList)
+        {
+            // 1 удаляем старые источники
+
+            bool isDeleteTab = false;
+
+            ConnectorCandles[] connectors = Tabs.ToArray();
+
+            for (int i = 0; i < connectors.Length; i++)
+            {
+                connectors[i].Delete();
+                isDeleteTab = true;
+            }
+
+            if (isDeleteTab == true)
+            {
+                Save();
+            }
+
+            // 2 создаём новые источники
+
+            for (int i = 0; i < securitiesList.Count; i++)
+            {
+                TryRunSecurity(securitiesList[i], Creator);
+            }
+
+            Save();
         }
 
         private void _uiSecuritiesSelection_Closed(object sender, EventArgs e)
@@ -295,12 +325,13 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 bool isDeleteTab = false;
 
-                for (int i = 0; i < Tabs.Count; i++)
+                ConnectorCandles[] connectors = Tabs.ToArray();
+
+                for (int i = 0; i < connectors.Length; i++)
                 {
-                    if (Tabs[i].TimeFrame != _creator.TimeFrame)
+                    if (connectors[i].TimeFrame != Creator.TimeFrame)
                     {
-                        Tabs[i].Delete();
-                        Tabs.RemoveAt(i);
+                        connectors[i].Delete();
                         isDeleteTab = true;
                     }
                 }
@@ -312,14 +343,14 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 // 2 создаём источники которые выбрал пользователь
 
-                _creator = UiSecuritiesSelection.SourcesCreator;
+                Creator = UiSecuritiesSelection.SourcesCreator;
 
-                if (_creator.SecuritiesNames != null &&
-                    _creator.SecuritiesNames.Count != 0)
+                if (Creator.SecuritiesNames != null &&
+                    Creator.SecuritiesNames.Count != 0)
                 {
-                    for (int i = 0; i < _creator.SecuritiesNames.Count; i++)
+                    for (int i = 0; i < Creator.SecuritiesNames.Count; i++)
                     {
-                        TryRunSecurity(_creator.SecuritiesNames[i], _creator);
+                        TryRunSecurity(Creator.SecuritiesNames[i], Creator);
                     }
 
                     Save();
@@ -337,7 +368,7 @@ namespace OsEngine.OsTrader.Panels.Tab
 
         public MassSourcesCreateUi UiSecuritiesSelection;
 
-        private MassSourcesCreator _creator;
+        public MassSourcesCreator Creator;
 
         /// <summary>
         /// request a class that stores a list of sources to be deployed for the index
@@ -425,6 +456,14 @@ namespace OsEngine.OsTrader.Panels.Tab
         public string GetChartLabel()
         {
             return _chartMaster.GetChartLabel();
+        }
+
+        /// <summary>
+        /// Add custom element to the chart
+        /// </summary>
+        public void SetChartElement(IChartElement element)
+        {
+            _chartMaster.SetChartElement(element);
         }
 
         #endregion

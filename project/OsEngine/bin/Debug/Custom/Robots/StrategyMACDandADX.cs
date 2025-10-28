@@ -195,7 +195,7 @@ namespace OsEngine.Robots
 
             // The prev value of the indicator
             _prevADX = _ADX.DataSeries[0].Values[_ADX.DataSeries[0].Values.Count - 2];
-            _lastMACD = _MACD.DataSeries[0].Values[_MACD.DataSeries[0].Values.Count - 2];
+            _prevMACD = _MACD.DataSeries[0].Values[_MACD.DataSeries[0].Values.Count - 2];
 
             List<Position> openPositions = _tab.PositionsOpenAll;
 
@@ -355,6 +355,14 @@ namespace OsEngine.Robots
 
                 if (tab.StartProgram == StartProgram.IsOsTrader)
                 {
+                    if (tab.Security.UsePriceStepCostToCalculateVolume == true
+                       && tab.Security.PriceStep != tab.Security.PriceStepCost
+                       && tab.PriceBestAsk != 0
+                       && tab.Security.PriceStep != 0
+                       && tab.Security.PriceStepCost != 0)
+                    {// расчёт количества контрактов для фьючерсов и опционов на Мосбирже
+                        qty = moneyOnPosition / (tab.PriceBestAsk / tab.Security.PriceStep * tab.Security.PriceStepCost);
+                    }
                     qty = Math.Round(qty, tab.Security.DecimalsVolume);
                 }
                 else

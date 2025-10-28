@@ -14,6 +14,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
@@ -320,6 +321,7 @@ namespace OsEngine.Market.Servers.Bybit
             SubscribeSecurityLinear.Clear();
             SubscribeSecurityInverse.Clear();
             SubscribedSecurityOption.Clear();
+            _subscribedOptionTradeBaseCoins.Clear();
 
             concurrentQueueMessagePublicWebSocket = new ConcurrentQueue<string>();
             _concurrentQueueMessageOrderBookSpot = new ConcurrentQueue<string>();
@@ -558,6 +560,50 @@ namespace OsEngine.Market.Servers.Bybit
 
         private List<Security> _securities;
 
+        private void LoadInstrumentsForCategory(Category category)
+        {
+            Dictionary<string, object> parametrs = new Dictionary<string, object>();
+            parametrs.Add("limit", "1000");
+            parametrs["category"] = category.ToString();
+            
+            string cursor = "";
+
+            while (true)
+            {
+                parametrs["cursor"] = cursor;
+
+                string securityData = CreatePublicQuery(parametrs, HttpMethod.Get, "/v5/market/instruments-info");
+
+                if (securityData != null)
+                {
+                    ResponseRestMessage<ArraySymbols> responseSymbols = JsonConvert.DeserializeObject<ResponseRestMessage<ArraySymbols>>(securityData);
+
+                    if (responseSymbols != null && responseSymbols.retCode == "0" && responseSymbols.retMsg == "OK")
+                    {
+                        ConvertSecurities(responseSymbols, category);
+                    }
+                    else
+                    {
+                        SendLogMessage($"{category} securities error. Code: {responseSymbols?.retCode}\nMessage: {responseSymbols?.retMsg}", LogMessageType.Error);
+                        break; 
+                    }
+
+                    if (string.IsNullOrEmpty(responseSymbols.result.nextPageCursor))
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        cursor = responseSymbols.result.nextPageCursor;
+                    }
+                }
+                else
+                {
+                    break; 
+                }
+            }
+        }
+
         public void GetSecurities()
         {
             try
@@ -567,71 +613,9 @@ namespace OsEngine.Market.Servers.Bybit
                     _securities = new List<Security>();
                 }
 
-                Dictionary<string, object> parametrs = new Dictionary<string, object>();
-                parametrs.Add("limit", "1000");
-                parametrs.Add("category", Category.spot);
-
-                string security = CreatePublicQuery(parametrs, HttpMethod.Get, "/v5/market/instruments-info");
-                ResponseRestMessage<ArraySymbols> responseSymbols;
-
-                if (security != null)
-                {
-                    responseSymbols = JsonConvert.DeserializeObject<ResponseRestMessage<ArraySymbols>>(security);
-
-                    if (responseSymbols != null
-                        && responseSymbols.retCode == "0"
-                        && responseSymbols.retMsg == "OK")
-                    {
-                        ConvertSecurities(responseSymbols, Category.spot);
-                    }
-                    else
-                    {
-                        SendLogMessage($"Spot securities error. Code: {responseSymbols.retCode}\n"
-                            + $"Message: {responseSymbols.retMsg}", LogMessageType.Error);
-                    }
-                }
-
-                parametrs["category"] = Category.linear;
-
-                security = CreatePublicQuery(parametrs, HttpMethod.Get, "/v5/market/instruments-info");
-
-                if (security != null)
-                {
-                    responseSymbols = JsonConvert.DeserializeObject<ResponseRestMessage<ArraySymbols>>(security);
-
-                    if (responseSymbols != null
-                        && responseSymbols.retCode == "0"
-                        && responseSymbols.retMsg == "OK")
-                    {
-                        ConvertSecurities(responseSymbols, Category.linear);
-                    }
-                    else
-                    {
-                        SendLogMessage($"Linear securities error. Code: {responseSymbols.retCode}\n"
-                            + $"Message: {responseSymbols.retMsg}", LogMessageType.Error);
-                    }
-                }
-
-                parametrs["category"] = Category.inverse;
-
-                security = CreatePublicQuery(parametrs, HttpMethod.Get, "/v5/market/instruments-info");
-
-                if (security != null)
-                {
-                    responseSymbols = JsonConvert.DeserializeObject<ResponseRestMessage<ArraySymbols>>(security);
-
-                    if (responseSymbols != null
-                        && responseSymbols.retCode == "0"
-                        && responseSymbols.retMsg == "OK")
-                    {
-                        ConvertSecurities(responseSymbols, Category.inverse);
-                    }
-                    else
-                    {
-                        SendLogMessage($"Inverse securities error. Code: {responseSymbols.retCode}\n"
-                            + $"Message: {responseSymbols.retMsg}", LogMessageType.Error);
-                    }
-                }
+                LoadInstrumentsForCategory(Category.spot);
+                LoadInstrumentsForCategory(Category.linear);
+                LoadInstrumentsForCategory(Category.inverse);
 
                 if (_useOptions)
                 {
@@ -702,11 +686,16 @@ namespace OsEngine.Market.Servers.Bybit
                     {
                         Security security = new Security();
                         security.NameFull = oneSec.symbol;
-
+                        
                         if (category == Category.linear
                             || category == Category.inverse)
                         {
                             security.SecurityType = SecurityType.Futures;
+
+                            DateTime origin = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
+                            DateTime expiration = origin.AddMilliseconds(oneSec.deliveryTime.ToDouble());
+                            security.Expiration = expiration;
+                            security.UnderlyingAsset = oneSec.baseCoin + oneSec.quoteCoin;
                         }
                         else
                         {
@@ -751,16 +740,16 @@ namespace OsEngine.Market.Servers.Bybit
                             security.NameClass = oneSec.quoteCoin + "_Options";
                             security.MinTradeAmount = oneSec.lotSizeFilter.minOrderQty.ToDecimal();
                             security.OptionType = oneSec.optionsType == "Call" ? OptionType.Call : OptionType.Put;
-                            security.UnderlyingAsset = oneSec.baseCoin + oneSec.quoteCoin;
 
                             // https://bybit-exchange.github.io/docs/api-explorer/v5/market/instrument
                             // get strike price from symbol signature
                             string[] tokens = oneSec.symbol.Split('-');
 
+                            security.UnderlyingAsset = oneSec.baseCoin + (oneSec.quoteCoin == "USDT" ? "USDT" : "") + "-" + tokens[1] + ".P";
+
                             // Strike price is always the 3rd token
                             string strikeStr = tokens[2].Trim();
                             security.Strike = strikeStr.ToDecimal();
-
 
                             // set expiration/delivery
                             DateTime origin = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
@@ -1942,6 +1931,8 @@ namespace OsEngine.Market.Servers.Bybit
 
         private List<string> SubscribedSecurityOption = new List<string>();
 
+        private List<string> _subscribedOptionTradeBaseCoins = new List<string>();
+
         private RateGate _rateGateSubscribe = new RateGate(1, TimeSpan.FromMilliseconds(50));
 
         public void Subscribe(Security security)
@@ -2193,9 +2184,14 @@ namespace OsEngine.Market.Servers.Bybit
                     }
 
                     // Note: option uses baseCoin, e.g., publicTrade.BTC https://bybit-exchange.github.io/docs/v5/websocket/public/trade
-                    string baseCoin = security.UnderlyingAsset.Split("USD")[0]; // e.g. BTCUSDT -> BTC
+                    string baseCoin = security.Name.Split('-')[0];
 
-                    webSocketPublicOption.SendAsync($"{{\"req_id\": \"trade0001\",  \"op\": \"subscribe\", \"args\": [\"publicTrade.{baseCoin}\" ] }}");
+                    if (!_subscribedOptionTradeBaseCoins.Contains(baseCoin))
+                    {
+                        webSocketPublicOption.SendAsync($"{{\"req_id\": \"trade0001\",  \"op\": \"subscribe\", \"args\": [\"publicTrade.{baseCoin}\" ] }}");
+                        _subscribedOptionTradeBaseCoins.Add(baseCoin);
+                    }
+
                     webSocketPublicOption.SendAsync($"{{\"req_id\": \"trade0001\",  \"op\": \"subscribe\", \"args\": [\"orderbook.25.{security.NameId}\" ] }}"); // only 25 or 100 for options
 
                     if (_extendedMarketData)
@@ -2269,6 +2265,7 @@ namespace OsEngine.Market.Servers.Bybit
                     webSocketPrivate.OnOpen -= WebSocketPrivate_Opened;
 
                     webSocketPrivate.CloseAsync();
+                    webSocketPrivate.Dispose();
                     webSocketPrivate = null;
                 }
                 catch (Exception ex)
@@ -2319,6 +2316,7 @@ namespace OsEngine.Market.Servers.Bybit
                     {
                         webSocketPublicSpot.CloseAsync();
                     }
+                    webSocketPublicSpot.Dispose();
                     webSocketPublicSpot = null;
                 }
             }
@@ -2366,6 +2364,7 @@ namespace OsEngine.Market.Servers.Bybit
                         webSocketPublicLinear.CloseAsync();
                     }
 
+                    webSocketPublicLinear.Dispose();
                     webSocketPublicLinear = null;
                 }
             }
@@ -2413,6 +2412,7 @@ namespace OsEngine.Market.Servers.Bybit
                         webSocketPublicInverse.CloseAsync();
                     }
 
+                    webSocketPublicInverse.Dispose();
                     webSocketPublicInverse = null;
                 }
             }
@@ -2462,6 +2462,7 @@ namespace OsEngine.Market.Servers.Bybit
                         webSocketPublicOption.CloseAsync();
                     }
 
+                    webSocketPublicOption.Dispose();
                     webSocketPublicOption = null;
                 }
             }
@@ -3925,23 +3926,39 @@ namespace OsEngine.Market.Servers.Bybit
                         MyOrderEvent?.Invoke(order);
                         return true;
                     }
-                }
+                    else
+                    {
+                        OrderStateType state = GetOrderStatus(order);
 
-                OrderStateType state = GetOrderStatus(order);
-
-                if (state == OrderStateType.None)
-                {
-                    SendLogMessage($"Cancel Order Error. Code: {order.NumberUser}.", LogMessageType.Error);
-                    return false;
+                        if (state == OrderStateType.None)
+                        {
+                            SendLogMessage($"Cancel Order Error. {place_order_response}.", LogMessageType.Error);
+                            return false;
+                        }
+                        else
+                        {
+                            return true;
+                        }
+                    }
                 }
                 else
                 {
-                    return true;
+                    OrderStateType state = GetOrderStatus(order);
+
+                    if (state == OrderStateType.None)
+                    {
+                        SendLogMessage($"Cancel Order Error. {place_order_response}.", LogMessageType.Error);
+                        return false;
+                    }
+                    else
+                    {
+                        return true;
+                    }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                SendLogMessage($" Cancel Order Error. Order num {order.NumberUser}, {order.SecurityNameCode}", LogMessageType.Error);
+                SendLogMessage($" Cancel Order Error. Order num {ex.Message} {ex.StackTrace}", LogMessageType.Error);
                 return false;
             }
         }

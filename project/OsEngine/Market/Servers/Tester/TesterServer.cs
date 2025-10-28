@@ -1279,7 +1279,14 @@ namespace OsEngine.Market.Servers.Tester
                         slippage = _slippageToSimpleOrder;
                     }
 
-                    ExecuteOnBoardOrder(order, lastTrade.Price, ServerTime, slippage);
+                    decimal realPrice = order.Price;
+
+                    if (isNewDay == true)
+                    {
+                        realPrice = lastTrade.Price;
+                    }
+
+                    ExecuteOnBoardOrder(order, realPrice, lastTrade.Time, slippage);
 
                     for (int i = 0; i < OrdersActive.Count; i++)
                     {
@@ -1328,7 +1335,14 @@ namespace OsEngine.Market.Servers.Tester
                         slippage = _slippageToSimpleOrder;
                     }
 
-                    ExecuteOnBoardOrder(order, lastTrade.Price, ServerTime, slippage);
+                    decimal realPrice = order.Price;
+
+                    if (isNewDay == true)
+                    {
+                        realPrice = lastTrade.Price;
+                    }
+
+                    ExecuteOnBoardOrder(order, realPrice, lastTrade.Time, slippage);
 
                     for (int i = 0; i < OrdersActive.Count; i++)
                     {
@@ -2427,6 +2441,7 @@ namespace OsEngine.Market.Servers.Tester
                         decimal go = array[i][2].ToDecimal();
                         decimal priceStepCost = array[i][3].ToDecimal();
                         decimal priceStep = array[i][4].ToDecimal();
+                        decimal goSell = 0;
 
                         int volDecimals = 0;
 
@@ -2434,16 +2449,37 @@ namespace OsEngine.Market.Servers.Tester
                         {
                             volDecimals = Convert.ToInt32(array[i][5]);
                         }
+                        if (array[i].Length > 6)
+                        {
+                            goSell = Convert.ToDecimal(array[i][6]);
+                        }
 
                         if (lot != 0)
+                        {
                             secu.Lot = lot;
+                        }
+                            
                         if (go != 0)
-                            secu.Go = go;
+                        {
+                            secu.MarginBuy = go;
+                        }
+                           
                         if (priceStepCost != 0)
+                        {
                             secu.PriceStepCost = priceStepCost;
+                        }
+                            
                         if (priceStep != 0)
+                        {
                             secu.PriceStep = priceStep;
+                        }
+                            
                         secu.DecimalsVolume = volDecimals;
+
+                        if(goSell != 0)
+                        {
+                            secu.MarginSell = goSell;
+                        }
                     }
                 }
             }
@@ -2548,10 +2584,11 @@ namespace OsEngine.Market.Servers.Tester
                 {
                     securityToSave.Name,
                     securityToSave.Lot.ToString(culture),
-                    securityToSave.Go.ToString(culture),
+                    securityToSave.MarginBuy.ToString(culture),
                     securityToSave.PriceStepCost.ToString(culture),
                     securityToSave.PriceStep.ToString(culture),
-                    securityToSave.DecimalsVolume.ToString(culture)
+                    securityToSave.DecimalsVolume.ToString(culture),
+                    securityToSave.MarginSell.ToString(culture)
                 });
             }
 
@@ -2571,10 +2608,11 @@ namespace OsEngine.Market.Servers.Tester
                 {
                     securityToSave.Name,
                     securityToSave.Lot.ToString(culture),
-                    securityToSave.Go.ToString(culture),
+                    securityToSave.MarginBuy.ToString(culture),
                     securityToSave.PriceStepCost.ToString(culture),
                     securityToSave.PriceStep.ToString(culture),
-                    securityToSave.DecimalsVolume.ToString(culture)
+                    securityToSave.DecimalsVolume.ToString(culture),
+                    securityToSave.MarginSell.ToString(culture)
                 });
             }
 
@@ -2591,7 +2629,8 @@ namespace OsEngine.Market.Servers.Tester
                             saves[i][2] + "$" +
                             saves[i][3] + "$" +
                             saves[i][4] + "$" +
-                            saves[i][5]
+                            saves[i][5] + "$" +
+                            saves[i][6]
                             );
                     }
 
@@ -2862,7 +2901,8 @@ namespace OsEngine.Market.Servers.Tester
                 security[security.Count - 1].Security.Name = name;
                 security[security.Count - 1].Security.Lot = 1;
                 security[security.Count - 1].Security.NameClass = "TestClass";
-                security[security.Count - 1].Security.Go = 1;
+                security[security.Count - 1].Security.MarginBuy = 1;
+                security[security.Count - 1].Security.MarginSell = 1;
                 security[security.Count - 1].Security.PriceStepCost = 1;
                 security[security.Count - 1].Security.PriceStep = 1;
                 // timeframe / тф
@@ -3195,7 +3235,8 @@ namespace OsEngine.Market.Servers.Tester
                 security[security.Count - 1].Security.Name = name;
                 security[security.Count - 1].Security.Lot = 1;
                 security[security.Count - 1].Security.NameClass = "TestClass";
-                security[security.Count - 1].Security.Go = 1;
+                security[security.Count - 1].Security.MarginBuy = 1;
+                security[security.Count - 1].Security.MarginSell = 1;
                 security[security.Count - 1].Security.PriceStepCost = 1;
                 security[security.Count - 1].Security.PriceStep = 1;
                 // timeframe / тф
@@ -3439,7 +3480,8 @@ namespace OsEngine.Market.Servers.Tester
                 security[security.Count - 1].Security.Name = name;
                 security[security.Count - 1].Security.Lot = 1;
                 security[security.Count - 1].Security.NameClass = "TestClass";
-                security[security.Count - 1].Security.Go = 1;
+                security[security.Count - 1].Security.MarginBuy = 1;
+                security[security.Count - 1].Security.MarginSell = 1;
                 security[security.Count - 1].Security.PriceStepCost = 1;
                 security[security.Count - 1].Security.PriceStep = 1;
                 // timeframe / тф
@@ -4407,7 +4449,7 @@ namespace OsEngine.Market.Servers.Tester
                     if (curTrades != null &&
                         curTrades.Count > 100)
                     {
-                        curTrades = curTrades.GetRange(curTrades.Count - 101, 100);
+                        curTrades = curTrades.GetRange(curTrades.Count - 100, 100);
                         _allTrades[i] = curTrades;
                     }
                 }
