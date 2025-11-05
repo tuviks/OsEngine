@@ -886,8 +886,8 @@ namespace OsEngine.Market.Servers.Tester
                 // check availability of securities on the market / проверяем наличие инструмента на рынке
 
                 SecurityTester security = null;
-                
-                if(order.MySecurityInTester != null)
+
+                if (order.MySecurityInTester != null)
                 {
                     security = order.MySecurityInTester;
                 }
@@ -909,7 +909,7 @@ namespace OsEngine.Market.Servers.Tester
 
                     if (lastTrades != null
                         && lastTrades.Count != 0
-                        && CheckOrdersInTickTest(order, lastTrades[lastTrades.Count - 1], false,security.IsNewDayTrade))
+                        && CheckOrdersInTickTest(order, lastTrades[lastTrades.Count - 1], false, security.IsNewDayTrade))
                     {
                         i--;
                         break;
@@ -1180,7 +1180,7 @@ namespace OsEngine.Market.Servers.Tester
         {
             SecurityTester security = null;
 
-            if(order.MySecurityInTester != null)
+            if (order.MySecurityInTester != null)
             {
                 security = order.MySecurityInTester;
             }
@@ -2442,6 +2442,7 @@ namespace OsEngine.Market.Servers.Tester
                         decimal priceStepCost = array[i][3].ToDecimal();
                         decimal priceStep = array[i][4].ToDecimal();
                         decimal goSell = 0;
+                        DateTime expiration = DateTime.MinValue;
 
                         int volDecimals = 0;
 
@@ -2449,34 +2450,40 @@ namespace OsEngine.Market.Servers.Tester
                         {
                             volDecimals = Convert.ToInt32(array[i][5]);
                         }
+
                         if (array[i].Length > 6)
                         {
                             goSell = Convert.ToDecimal(array[i][6]);
+                        }
+
+                        if (array[i].Length > 7)
+                        {
+                            secu.Expiration = Convert.ToDateTime(array[i][7]);
                         }
 
                         if (lot != 0)
                         {
                             secu.Lot = lot;
                         }
-                            
+
                         if (go != 0)
                         {
                             secu.MarginBuy = go;
                         }
-                           
+
                         if (priceStepCost != 0)
                         {
                             secu.PriceStepCost = priceStepCost;
                         }
-                            
+
                         if (priceStep != 0)
                         {
                             secu.PriceStep = priceStep;
                         }
-                            
+
                         secu.DecimalsVolume = volDecimals;
 
-                        if(goSell != 0)
+                        if (goSell != 0)
                         {
                             secu.MarginSell = goSell;
                         }
@@ -2588,7 +2595,8 @@ namespace OsEngine.Market.Servers.Tester
                     securityToSave.PriceStepCost.ToString(culture),
                     securityToSave.PriceStep.ToString(culture),
                     securityToSave.DecimalsVolume.ToString(culture),
-                    securityToSave.MarginSell.ToString(culture)
+                    securityToSave.MarginSell.ToString(culture),
+                    securityToSave.Expiration.ToString(culture)
                 });
             }
 
@@ -2612,7 +2620,8 @@ namespace OsEngine.Market.Servers.Tester
                     securityToSave.PriceStepCost.ToString(culture),
                     securityToSave.PriceStep.ToString(culture),
                     securityToSave.DecimalsVolume.ToString(culture),
-                    securityToSave.MarginSell.ToString(culture)
+                    securityToSave.MarginSell.ToString(culture),
+                    securityToSave.Expiration.ToString(culture)
                 });
             }
 
@@ -2630,7 +2639,8 @@ namespace OsEngine.Market.Servers.Tester
                             saves[i][3] + "$" +
                             saves[i][4] + "$" +
                             saves[i][5] + "$" +
-                            saves[i][6]
+                            saves[i][6] + "$" +
+                            saves[i][7]
                             );
                     }
 
@@ -3103,17 +3113,14 @@ namespace OsEngine.Market.Servers.Tester
                         }
                     }
 
-
                     if (minPriceStep == 1 &&
                         countFive == 20)
                     {
                         minPriceStep = 5;
                     }
 
-
                     security[security.Count - 1].Security.PriceStep = minPriceStep;
                     security[security.Count - 1].Security.PriceStepCost = minPriceStep;
-
 
                     // last data / последняя дата
                     string lastString = firstRowInFile;
@@ -3132,6 +3139,7 @@ namespace OsEngine.Market.Servers.Tester
                     Candle candle3 = new Candle();
                     candle3.SetCandleFromString(lastString);
                     security[security.Count - 1].TimeEnd = candle3.TimeStart;
+                    security[security.Count - 1].Security.Expiration = candle3.TimeStart;
                     continue;
                 }
                 catch (Exception)
@@ -3283,7 +3291,6 @@ namespace OsEngine.Market.Servers.Tester
 
                         decimal open = (decimal)Convert.ToDouble(tradeN.Price);
 
-
                         if (open.ToString(culture).Split('.').Length > 1)
                         {
                             // if the real part takes place / если имеет место вещественная часть
@@ -3356,13 +3363,11 @@ namespace OsEngine.Market.Servers.Tester
                         }
                     }
 
-
                     if (minPriceStep == 1 &&
                         countFive == 20)
                     {
                         minPriceStep = 5;
                     }
-
 
                     security[security.Count - 1].Security.PriceStep = minPriceStep;
                     security[security.Count - 1].Security.PriceStepCost = minPriceStep;
@@ -3385,6 +3390,7 @@ namespace OsEngine.Market.Servers.Tester
                     Trade trade2 = new Trade();
                     trade2.SetTradeFromString(lastString2);
                     security[security.Count - 1].TimeEnd = trade2.Time;
+                    security[security.Count - 1].Security.Expiration = trade2.Time;
                 }
                 catch (Exception)
                 {
@@ -3556,7 +3562,6 @@ namespace OsEngine.Market.Servers.Tester
                                 length = open.ToString(culture).Split('.')[1].Length;
                             }
 
-
                             if (length == 1 && minPriceStep > 0.1m)
                             {
                                 minPriceStep = 0.1m;
@@ -3617,13 +3622,11 @@ namespace OsEngine.Market.Servers.Tester
                         }
                     }
 
-
                     if (minPriceStep == 1 &&
                         countFive == 20)
                     {
                         minPriceStep = 5;
                     }
-
 
                     security[security.Count - 1].Security.PriceStep = minPriceStep;
                     security[security.Count - 1].Security.PriceStepCost = minPriceStep;
@@ -3646,6 +3649,7 @@ namespace OsEngine.Market.Servers.Tester
                     MarketDepth trade2 = new MarketDepth();
                     trade2.SetMarketDepthFromString(lastString2);
                     security[security.Count - 1].TimeEnd = trade2.Time;
+                    security[security.Count - 1].Security.Expiration = trade2.Time;
                 }
                 catch
                 {
@@ -3737,6 +3741,7 @@ namespace OsEngine.Market.Servers.Tester
                 {
                     return null;
                 }
+
                 // need to start the server if it is still disabled / надо запустить сервер если он ещё отключен
                 if (ServerStatus != ServerConnectStatus.Connect)
                 {
@@ -3802,7 +3807,6 @@ namespace OsEngine.Market.Servers.Tester
                         }
                     }
                 }
-
                 else if (TypeTesterData != TesterDataType.Candle &&
                          timeFrameBuilder.CandleMarketDataType == CandleMarketDataType.MarketDepth)
                 {

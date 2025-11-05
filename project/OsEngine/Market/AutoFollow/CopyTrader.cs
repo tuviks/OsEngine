@@ -499,7 +499,11 @@ namespace OsEngine.Market.AutoFollow
                 }
             }
 
-            positionToCopy.SlaveSecurityName = positionToCopy.SecurityNameMaster;
+            if(positionToCopy.SlaveSecurityName == null)
+            {
+                positionToCopy.SlaveSecurityName = positionToCopy.SecurityNameMaster;
+            }
+         
             
 
         }
@@ -747,7 +751,7 @@ namespace OsEngine.Market.AutoFollow
 
             if(copyServerTime == DateTime.MinValue)
             {
-                return;
+                copyServerTime = DateTime.Now;
             }
 
             if (TradePeriodsSettings.CanTradeThisTime(copyServerTime) == false)

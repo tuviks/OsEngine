@@ -999,7 +999,7 @@ namespace OsEngine.Language
 
         public string Label241 => OsLocalization.ConvertToLocString(
          "Eng:Non trade periods_" +
-         "Ru:Не торговые периоды_");
+         "Ru:Неторговые периоды_");
 
         public string Label242 => OsLocalization.ConvertToLocString(
          "Eng:Check data feed on disconnect_" +
@@ -1034,16 +1034,16 @@ namespace OsEngine.Language
          "Ru:Выбор режима маржи. Кросс-маржа или изолированная_");
 
         public string Label250 => OsLocalization.ConvertToLocString(
-         "Eng:Selecting a hedging mode. If on - the hedging mode is enabled; if off - the one-way mode is enabled_" +
-         "Ru:Выбор режима хеджирования. Если on - то включен режим хеджирования, если off - включен односторонний режим_");
+         "Eng:Selecting a hedging mode. If True - the hedging mode is enabled; if False - the one-way mode is enabled_" +
+         "Ru:Выбор режима хеджирования. Если True - то включен режим хеджирования, если False - включен односторонний режим_");
 
         public string Label251 => OsLocalization.ConvertToLocString(
          "Eng:Set leverage from 1 to the maximum allowed by the exchange. Works only for linear futures. If left blank, the leverage you set on the exchange is used_" +
          "Ru:Устанавливаем кредитное плечо от 1 до максимально разрешенного биржей. Работает только для линейных фьючерсов. Если поле оставить пустым, то используется плечо, которое вы установили на бирже_");
 
         public string Label252 => OsLocalization.ConvertToLocString(
-        "Eng:If True, we request information on open interest, funding, and volume24. It should also be true if you're using options. If you're not using this data, it's recommended to set it to False_" +
-        "Ru:Если True - то запрашиваем информацию по открытому интересу, фандингу, объему24. А так же должно быть true, если вы задействуете опционы. Если вы не используйте эти данные, то рекомендуется установить False_");
+        "Eng:If True, we request information on open interest, funding, and volume24. It should also be True if you're using options. If you're not using this data, it's recommended to set it to False_" +
+        "Ru:Если True - то запрашиваем информацию по открытому интересу, фандингу, объему24. А так же должно быть True, если вы задействуете опционы. Если вы не используйте эти данные, то рекомендуется установить False_");
 
         public string Label253 => OsLocalization.ConvertToLocString(
          "Eng:If True, we request options. If you don't use them, we recommend setting it to False_" +
@@ -1084,15 +1084,27 @@ namespace OsEngine.Language
         public string Label262 => OsLocalization.ConvertToLocString(
          "Eng:Includes a currency trading platform_" +
          "Ru:Включает площадку для торговли валютой_");
+
         public string Label263 => OsLocalization.ConvertToLocString(
          "Eng:Includes a platform for trading commodities_" +
          "Ru:Включает площадку для торговли сырьевыми товарами_");
+
         public string Label264 => OsLocalization.ConvertToLocString(
          "Eng:Includes a platform for trading funds_" +
          "Ru:Включает площадку для торговли фондами_");
+
         public string Label265 => OsLocalization.ConvertToLocString(
          "Eng:It includes a platform for trading other instruments, such as stocks._" +
          "Ru:Включает площадку для торговли другими инструментами, например акциями_");
+
+        public string Label266 => OsLocalization.ConvertToLocString(
+         "Eng:IP address of the Expert advisor. It is recommended to run the MT5 terminal and OsEngine on the same local machine_" +
+         "Ru:IP адрес советника. Рекомендуется запускать терминал МТ5 и OsEngine на одной локальной машине_");
+
+        public string Label267 => OsLocalization.ConvertToLocString(
+         "Eng:Expert advisor port. It is recommended to run the MT5 terminal and OsEngine on the same local machine_" +
+         "Ru:Порт советника. Рекомендуется запускать терминал МТ5 и OsEngine на одной локальной машине_");
+
 
         public string LabelCommissionType => OsLocalization.ConvertToLocString(
             "Eng:Commission type_" +
@@ -1113,6 +1125,66 @@ namespace OsEngine.Language
         public string TabItem2 => OsLocalization.ConvertToLocString(
             "Eng: Logging_" +
             "Ru: Логирование _");
+
+        public string Label268 => OsLocalization.ConvertToLocString(
+        "Eng:A demo server where you can trade on a virtual account. If True, demo mode is enabled; if False, it's disabled. Separate public and private keys are required for demo mode_" +
+        "Ru:Демонстрационный сервер, где можно поторговать на виртуальном счете. Если True - то демо режим включен, если False - выключен. Для демо нужно выписывать отдельные публичный и приватный ключи_");
+
+        public string Label269 => OsLocalization.ConvertToLocString(
+        "Eng:If True, we request information on volume24. If you do not use this data, it is recommended to set it to False_" +
+        "Ru:Если True - то запрашиваем информацию по объему24. Если вы не используйте эти данные, то рекомендуется установить False_");
+
+        public string Label270 => OsLocalization.ConvertToLocString(
+        "Eng:If True, we request information on open interest, funding, and volume24. If you're not using this data, it's recommended to set it to False_" +
+        "Ru:Если True - то запрашиваем информацию по открытому интересу, фандингу, объему24. Если вы не используйте эти данные, то рекомендуется установить False_");
+
+        public string Label271 => OsLocalization.ConvertToLocString(
+         "Eng:Passphrase. This is written down on the exchange's website in the API section when you generate keys_" +
+         "Ru:Кодовая фраза. Выписывается на сайте биржи в разделе API, когда создаете ключи_");
+
+        public string Label272 => OsLocalization.ConvertToLocString(
+         "Eng:Id. This can be found on the exchange's website in the API section_" +
+         "Ru:Id. Выписывается на сайте биржи в разделе API_");
+
+        public string Label273 => OsLocalization.ConvertToLocString(
+         "Eng:Choosing a trading mode. Spot or margin_" +
+         "Ru:Выбор режима торговли. Спот или маржин_");
+
+        public string Label274 => OsLocalization.ConvertToLocString(
+         "Eng:Selecting a margin currency_" +
+         "Ru:Выбор маржинальной валюты_");
+
+        public string Label275 => OsLocalization.ConvertToLocString(
+         "Eng:Selecting a server for trading. Live or test trading. A separate account and API keys are created for each server_" +
+         "Ru:Выбор сервера для торговли. Реальная торговля или тестовая. Для каждого сервера создается отдельный аккаунт и api ключи_");
+
+        public string Label276 => OsLocalization.ConvertToLocString(
+         "Eng:If True, we use the Post Only order type. This is only for limit orders. Post Only is an order type that guarantees that your order will be placed in the order book as a maker and will not be executed as a taker_" +
+         "Ru:Если True - то используем тип ордера Post Only. Доступно только для лимитных ордеров. Post Only — это тип ордера, который гарантирует, что ваш ордер будет размещен в книги заявок как maker и не исполнится как taker_");
+
+        public string Label277 => OsLocalization.ConvertToLocString(
+         "Eng:User ID. Assigned to each registered user on the exchange._" +
+         "Ru:UID пользователя. Присваивается каждому зарегистрированному пользователю на бирже_");
+
+        public string Label278 => OsLocalization.ConvertToLocString(
+         "Eng:Max spread to build candles_" +
+         "Ru:Max спред для свечек_");
+
+        public string Label279=> OsLocalization.ConvertToLocString(
+         "Eng:Max spread limit is on_" +
+         "Ru:Включить ограничение_");
+
+        public string Label280 => OsLocalization.ConvertToLocString(
+         "Eng:Max spread value %_" +
+         "Ru:Max ширина спреда %_");
+
+        public string Label281 => OsLocalization.ConvertToLocString(
+         "Eng:The button opens the non-trading periods settings window for the connector. By selecting a non-trading period, the connector will ignore incoming data about trades and market depth. PC time is used as the control time!_" +
+         "Ru:Кнопка открывает окно настроек неторговых периодов для коннектора. Выбрав неторговый период, коннектор будет игнорировать поступающие данные о трейдах и стакана. В качестве контролького времени используется время ПК!_");
+       
+        public string Label282 => OsLocalization.ConvertToLocString(
+         "Eng:Shifts the time of candles, trades, market depth, and orders to a specific time._" +
+         "Ru:Сдвигает время свечей, сделок, стакана и ордеров на определенное кол-во часов._");
 
         // Servers
 
@@ -1641,6 +1713,10 @@ namespace OsEngine.Language
         public string ServerParam13 => OsLocalization.ConvertToLocString(
           "Eng:Market depth levels_" +
           "Ru:Уровней в стакане_");
+
+        public string ServerParam14 => OsLocalization.ConvertToLocString(
+          "Eng:Non trading periods_" +
+          "Ru:Неторговые периоды_");
 
         public string UseStock => OsLocalization.ConvertToLocString(
             "Eng:Stock_" +

@@ -38,6 +38,14 @@ namespace OsEngine.Market.Servers.BitGet.BitGetFutures
             CreateParameterEnum("Margin Mode", "Crossed", new List<string> { "Crossed", "Isolated" });
             CreateParameterBoolean("Demo Trading", false);
             CreateParameterBoolean("Extended Data", false);
+
+            ServerParameters[0].Comment = OsLocalization.Market.Label246;
+            ServerParameters[1].Comment = OsLocalization.Market.Label247;
+            ServerParameters[2].Comment = OsLocalization.Market.Label271;
+            ServerParameters[3].Comment = OsLocalization.Market.Label250;
+            ServerParameters[4].Comment = OsLocalization.Market.Label249;
+            ServerParameters[5].Comment = OsLocalization.Market.Label268;
+            ServerParameters[6].Comment = OsLocalization.Market.Label270;
         }
     }
 
@@ -2318,41 +2326,35 @@ namespace OsEngine.Market.Servers.BitGet.BitGetFutures
             {
                 ResponseWebSocketMessageAction<List<ResponseWebsocketTrade>> responseTrade = JsonConvert.DeserializeAnonymousType(message, new ResponseWebSocketMessageAction<List<ResponseWebsocketTrade>>());
 
-                if (responseTrade == null)
+                if (responseTrade == null 
+                    || responseTrade.data == null)
                 {
                     return;
                 }
 
-                if (responseTrade.data == null)
+                for (int i = 0; i < responseTrade.data.Count; i++)
                 {
-                    return;
-                }
+                    Trade trade = new Trade();
+                    trade.SecurityNameCode = responseTrade.arg.instId;
+                    trade.Price = responseTrade.data[i].price.ToDecimal();
+                    trade.Id = responseTrade.data[i].tradeId;
 
-                if (responseTrade.data[0] == null)
-                {
-                    return;
-                }
+                    if (trade.Id == null)
+                    {
+                        return;
+                    }
 
-                Trade trade = new Trade();
-                trade.SecurityNameCode = responseTrade.arg.instId;
-                trade.Price = responseTrade.data[0].price.ToDecimal();
-                trade.Id = responseTrade.data[0].tradeId;
+                    trade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(responseTrade.data[i].ts));
+                    trade.Volume = responseTrade.data[i].size.ToDecimal();
+                    trade.Side = responseTrade.data[i].side.Equals("buy") ? Side.Buy : Side.Sell;
 
-                if (trade.Id == null)
-                {
-                    return;
-                }
+                    if (_extendedMarketData)
+                    {
+                        trade.OpenInterest = GetOpenInterestValue(trade.SecurityNameCode);
+                    }
 
-                trade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(responseTrade.data[0].ts));
-                trade.Volume = responseTrade.data[0].size.ToDecimal();
-                trade.Side = responseTrade.data[0].side.Equals("buy") ? Side.Buy : Side.Sell;
-
-                if (_extendedMarketData)
-                {
-                    trade.OpenInterest = GetOpenInterestValue(trade.SecurityNameCode);
-                }
-
-                NewTradesEvent(trade);
+                    NewTradesEvent(trade);
+                }    
             }
             catch (Exception ex)
             {

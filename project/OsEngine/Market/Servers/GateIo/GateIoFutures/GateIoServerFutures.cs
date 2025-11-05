@@ -31,12 +31,20 @@ namespace OsEngine.Market.Servers.GateIo.GateIoFutures
         {
             ServerNum = uniqueNumber;
             ServerRealization = new GateIoServerFuturesRealization();
+
             CreateParameterString(OsLocalization.Market.ServerParamPublicKey, "");
             CreateParameterPassword(OsLocalization.Market.ServerParameterSecretKey, "");
             CreateParameterString("User ID", "");
-            CreateParameterEnum("Base Wallet", "USDT", new List<string> { "USDT", "BTC" });
+            CreateParameterEnum("Currency", "USDT", new List<string> { "USDT", "BTC" });
             CreateParameterEnum("Hedge Mode", "On", new List<string> { "On", "Off" });
             CreateParameterBoolean("Extended Data", false);
+
+            ServerParameters[0].Comment = OsLocalization.Market.Label246;
+            ServerParameters[1].Comment = OsLocalization.Market.Label247;
+            ServerParameters[2].Comment = OsLocalization.Market.Label277;
+            ServerParameters[3].Comment = OsLocalization.Market.Label274;
+            ServerParameters[4].Comment = OsLocalization.Market.Label250;
+            ServerParameters[5].Comment = OsLocalization.Market.Label270;
         }
     }
 
@@ -154,7 +162,6 @@ namespace OsEngine.Market.Servers.GateIo.GateIoFutures
             {
                 CreatePublicWebSocketConnect();
                 CreatePrivateWebSocketConnect();
-                //SetDualMode();
             }
             else
             {
@@ -2067,24 +2074,29 @@ namespace OsEngine.Market.Servers.GateIo.GateIoFutures
 
                     OrderStateType orderState = OrderStateType.None;
 
-                    if (responseOrders.result[i].status.Equals("open"))
+                    if (responseOrders.result[i].finish_as.Equals("_new"))
                     {
                         orderState = OrderStateType.Active;
                     }
+                    else if (responseOrders.result[i].finish_as.Equals("cancelled"))
+                    {
+                        orderState = OrderStateType.Cancel;
+                    }
+                    else if (responseOrders.result[i].finish_as.Equals("liquidated"))
+                    {
+                        orderState = OrderStateType.Fail;
+                    }
+                    else if (responseOrders.result[i].finish_as.Equals("filled"))
+                    {
+                        orderState = OrderStateType.Done;
+                    }
+                    else if (responseOrders.result[i].finish_as.Equals("_update"))
+                    {
+                        orderState = OrderStateType.Partial;
+                    }
                     else
                     {
-                        if (responseOrders.result[i].finish_as.Equals("cancelled"))
-                        {
-                            orderState = OrderStateType.Cancel;
-                        }
-                        else if (responseOrders.result[i].finish_as.Equals("liquidated"))
-                        {
-                            orderState = OrderStateType.Fail;
-                        }
-                        else if (responseOrders.result[i].finish_as.Equals("filled"))
-                        {
-                            orderState = OrderStateType.Done;
-                        }
+                        orderState = OrderStateType.None;
                     }
 
                     try
