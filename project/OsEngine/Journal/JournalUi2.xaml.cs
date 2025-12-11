@@ -27,7 +27,6 @@ using OsEngine.Layout;
 using OsEngine.Market;
 using System.Windows.Media;
 using OsEngine.OsData;
-using OpenFAST;
 
 namespace OsEngine.Journal
 {
@@ -45,9 +44,6 @@ namespace OsEngine.Journal
             InitializeComponent();
             OsEngine.Layout.StickyBorders.Listen(this);
 
-            LabelBenchmark.Visibility = Visibility.Hidden;
-            ComboBoxBenchmark.Visibility = Visibility.Hidden;
-
             _startProgram = startProgram;
             _botsJournals = botsJournals;
 
@@ -64,6 +60,7 @@ namespace OsEngine.Journal
             ComboBoxBenchmark.Items.Add(BenchmarkSecurity.BTC.ToString());
             ComboBoxBenchmark.Items.Add(BenchmarkSecurity.MCFTR.ToString());
             ComboBoxBenchmark.Items.Add(BenchmarkSecurity.SnP500.ToString());
+            ComboBoxBenchmark.Items.Add(BenchmarkSecurity.IMOEX.ToString());
             ComboBoxBenchmark.SelectedItem = BenchmarkSecurity.Off.ToString();
 
             _currentCulture = OsLocalization.CurCulture;
@@ -112,6 +109,9 @@ namespace OsEngine.Journal
             LabelEqutyCharteType.Content = OsLocalization.Journal.Label8;
             LabelBenchmark.Content = OsLocalization.Journal.Label23;
 
+            TabItemSecurities.Header = OsLocalization.Journal.TabItemSecurities;
+            TabItemPortfolio.Header = OsLocalization.Journal.TabItemPortfolio;
+
             CreatePositionsLists();
 
             SelectOpenPosesPages();
@@ -156,7 +156,9 @@ namespace OsEngine.Journal
 
             ComboBoxChartType.SelectionChanged += ComboBoxChartType_SelectionChanged;
             TabControlPrime.SelectionChanged += TabControlPrime_SelectionChanged;
+            TabControlVolume.SelectionChanged += TabControlVolume_SelectionChanged;
             ComboBoxBenchmark.SelectionChanged += ComboBoxBenchmark_SelectionChanged;
+            VolumeShowNumbers.SelectionChanged += VolumeShowNumbers_SelectionChanged;
 
             CheckBoxShowDontOpenPoses.Click += CheckBoxShowDontOpenPoses_Click;
             CheckBoxShowDontOpenPoses.Content = OsLocalization.Journal.Label17;
@@ -173,10 +175,12 @@ namespace OsEngine.Journal
                 IsErase = true;
 
                 TabControlPrime.SelectionChanged -= TabControlPrime_SelectionChanged;
+                TabControlVolume.SelectionChanged -= TabControlVolume_SelectionChanged;
                 ComboBoxChartType.SelectionChanged -= ComboBoxChartType_SelectionChanged;
                 VolumeShowNumbers.SelectionChanged -= VolumeShowNumbers_SelectionChanged;
                 ComboBoxBenchmark.SelectionChanged -= ComboBoxBenchmark_SelectionChanged;
                 TabControlPrime.Items.Clear();
+                TabControlVolume.Items.Clear();
 
                 Closing -= JournalUi_Closing;
                 _botsJournals.Clear();
@@ -222,6 +226,33 @@ namespace OsEngine.Journal
                     HostVolume.Child.Hide();
                     HostVolume.Child = null;
                     HostVolume = null;
+                }
+
+                if (_chartPortfolio != null)
+                {
+                    _chartPortfolio.MouseMove -= _chartEquity_MouseMove;
+                    _chartPortfolio.MouseWheel -= _chartEquity_MouseWheel;
+                    _chartPortfolio.Series.Clear();
+                    _chartPortfolio.ChartAreas.Clear();
+                    _chartPortfolio = null;
+                }
+
+                if (_gridLeveragePortfolio != null)
+                {
+                    DataGridFactory.ClearLinks(_gridLeveragePortfolio);
+                    _gridLeveragePortfolio.Rows.Clear();
+                    _gridLeveragePortfolio.DataError -= _gridLeveragePortfolio_DataError;
+                    _gridLeveragePortfolio.Dispose();
+                    _gridLeveragePortfolio = null;                   
+                }
+
+                if (_layoutPanelPortfolio != null)
+                {
+                    _layoutPanelPortfolio.Controls.Clear();
+                    _layoutPanelPortfolio = null;
+                    HostVolumePortfolio.Child.Hide();
+                    HostVolumePortfolio.Child = null;
+                    HostVolumePortfolio = null;
                 }
 
                 if (_chartDd != null)
@@ -394,7 +425,6 @@ namespace OsEngine.Journal
                     return;
                 }
 
-
                 List<Position> allSortPoses = new List<Position>();
                 List<Position> longPositions = new List<Position>();
                 List<Position> shortPositions = new List<Position>();
@@ -443,7 +473,6 @@ namespace OsEngine.Journal
 
                 lock (_paintLocker)
                 {
-
                     if (TabControlPrime.SelectedIndex == -1 ||
                         TabControlPrime.SelectedIndex == 0)
                     {
@@ -461,7 +490,7 @@ namespace OsEngine.Journal
                     }
                     else if (TabControlPrime.SelectedIndex == 3)
                     {
-                        PaintVolumeOnChart(allSortPoses);
+                        PaintVolume(allSortPoses);
                     }
                     else if (TabControlPrime.SelectedIndex == 4)
                     {
@@ -473,7 +502,6 @@ namespace OsEngine.Journal
                     }
 
                     PaintTitleAbsProfit(allSortPoses);
-
                 }
             }
             catch (Exception error)
@@ -484,7 +512,7 @@ namespace OsEngine.Journal
 
         private void PaintTitleAbsProfit(List<Position> positionsAll)
         {
-            decimal absProfit = PositionStatisticGenerator.GetAllProfitInAbsolute(positionsAll.ToArray());
+            decimal absProfit = PositionStatisticGenerator.GetAllProfitInAbsolute(positionsAll.ToArray(), false);
 
             if (absProfit != 0)
             {
@@ -548,10 +576,15 @@ namespace OsEngine.Journal
             }
         }
 
+        private int _countLoadBenchmark = 0;
+
         private void ComboBoxBenchmark_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             try
             {
+                _countLoadBenchmark = 0;
+                _checkBenchmarkData = false;
+
                 RePaint();
                 SaveSettings();
             }
@@ -735,7 +768,7 @@ namespace OsEngine.Journal
 
         #region Equity chart
 
-        Chart _chartEquity;
+        private Chart _chartEquity;
 
         private void CreateChartProfit()
         {
@@ -985,6 +1018,8 @@ namespace OsEngine.Journal
 
         private int _lastSeriesEquityChartPointWithLabel = 0;
 
+        private decimal _startValuePortfolio;
+
         private void PaintProfitOnChart(List<Position> positionsAll)
         {
             try
@@ -1071,6 +1106,11 @@ namespace OsEngine.Journal
                     }
                     else if (chartType == "Percent 1 contract")
                     {
+                        if (positionsAll[i].NameBotClass == "TaxPayer"
+                         || positionsAll[i].NameBotClass == "PayOfMarginBot")
+                        {
+                            continue;
+                        }
                         curProfit = positionsAll[i].ProfitOperationPercent * (curMult / 100);
                     }
 
@@ -1186,9 +1226,12 @@ namespace OsEngine.Journal
                     ComboBoxBenchmark.IsEnabled = false;
                 }
 
-                if (ComboBoxBenchmark.SelectedItem.ToString() != BenchmarkSecurity.Off.ToString() &&
+                if (positionsAll.Count > 0
+                    && ComboBoxBenchmark.SelectedItem.ToString() != BenchmarkSecurity.Off.ToString() &&
                     chartType == "Absolute")
                 {
+                    _startValuePortfolio = positionsAll[0].PortfolioValueOnOpenPosition;
+
                     Series benchmarkLine = GetBenchmarkPoints(nullLine, maxYVal, minYval);
 
                     if (benchmarkLine != null)
@@ -1275,8 +1318,10 @@ namespace OsEngine.Journal
 
                 if (data == null && !_checkBenchmarkData)
                 {
-                    _benchmark.GetData(series);
                     _checkBenchmarkData = true;
+                    _countLoadBenchmark++;
+
+                    _benchmark.GetData(series);
                 }
                 else
                 {
@@ -1347,9 +1392,23 @@ namespace OsEngine.Journal
                     }
                 }
 
-                if (candleData == null || candleData.Count == 0) return null;
-                if (DateTime.Parse(series.Points[0].AxisLabel) < listData[0]) return null;
-                if (DateTime.Parse(series.Points[^1].AxisLabel).AddDays(-1).Date > listData[^1]) return null;
+                if (_countLoadBenchmark < 3)
+                {
+                    if (candleData == null || candleData.Count == 0)
+                    {
+                        return null;
+                    }
+
+                    if (DateTime.Parse(series.Points[0].AxisLabel) < listData[0])
+                    {
+                        return null;
+                    }
+
+                    if (DateTime.Parse(series.Points[^1].AxisLabel).AddDays(-1).Date > listData[^1])
+                    {
+                        return null;
+                    }
+                }
 
                 List<decimal> data = new();
 
@@ -1360,8 +1419,8 @@ namespace OsEngine.Journal
                     DateTime roundedDateTime = candleData.Keys
                             .Where(date => date < dateTime)
                             .OrderByDescending(date => date)
-                            .FirstOrDefault();
-
+                            .FirstOrDefault(candleData.Keys.Min());
+                                        
                     if (candleData.ContainsKey(roundedDateTime))
                     {
                         if (ComboBoxChartType.SelectedItem.ToString() == "Absolute")
@@ -1370,8 +1429,9 @@ namespace OsEngine.Journal
                         }                        
                     }
                 }
+
                 return data;
-            }
+            }            
             catch (Exception error)
             {
                 SendNewLogMessage(error.ToString(), LogMessageType.Error);
@@ -1385,10 +1445,7 @@ namespace OsEngine.Journal
             {                
                 if (originalData == null || originalData.Count == 0)
                     return new Series();
-
-                decimal dataMin = originalData.Min();
-                decimal dataMax = originalData.Max();
-
+               
                 Series benchmark = new Series("SeriesBenchmark");
                 benchmark.ChartType = SeriesChartType.Line;
                 benchmark.YAxisType = AxisType.Secondary;
@@ -1400,17 +1457,16 @@ namespace OsEngine.Journal
 
                 decimal startValue = originalData[0];
 
-                decimal dataRange = dataMax - dataMin;
-                decimal chartRange = Math.Max(Math.Abs(chartMax), Math.Abs(chartMin));
-
                 for (int i = 0; i < originalData.Count; i++)
                 {
                     decimal scaledValue = 0;
 
                     if (startValue != originalData[i])
                     {
-                        scaledValue = (originalData[i] - startValue) * chartRange / dataRange;
+                        decimal relativeGrowth = (originalData[i] - startValue) / startValue;
+                        scaledValue = _startValuePortfolio * relativeGrowth;
                     }
+
                     benchmark.Points.AddXY(i, scaledValue);
                     benchmark.Points[^1].AxisLabel = originalData[i].ToString();
                 }
@@ -1514,7 +1570,36 @@ namespace OsEngine.Journal
 
         #endregion
 
-        #region Volume Chart
+        #region Volume Tabs
+
+        private void PaintVolume(List<Position> positionsAll)
+        {
+            if (TabControlVolume.SelectedIndex == -1 ||
+                        TabControlVolume.SelectedIndex == 0)
+            {
+                PaintVolumeOnChart(positionsAll);
+            }
+            else if (TabControlVolume.SelectedIndex == 1)
+            {
+                PaintPortfolioOnChart(positionsAll);
+            }
+        }
+
+        private void TabControlVolume_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                RePaint();               
+            }
+            catch (Exception error)
+            {
+                SendNewLogMessage(error.ToString(), LogMessageType.Error);
+            }
+        }
+
+        #endregion
+
+        #region Volume Securities Chart
 
         private Chart _chartVolume;
 
@@ -1553,6 +1638,7 @@ namespace OsEngine.Journal
 
                 VolumeShowNumbers.SelectionChanged -= VolumeShowNumbers_SelectionChanged;
                 TabControlPrime.SelectionChanged -= TabControlPrime_SelectionChanged;
+                TabControlVolume.SelectionChanged -= TabControlVolume_SelectionChanged;
 
                 string lastSelectedValue = null;
 
@@ -1605,6 +1691,7 @@ namespace OsEngine.Journal
 
                 VolumeShowNumbers.SelectionChanged += VolumeShowNumbers_SelectionChanged;
                 TabControlPrime.SelectionChanged += TabControlPrime_SelectionChanged;
+                TabControlVolume.SelectionChanged += TabControlVolume_SelectionChanged;
             }
             catch (Exception error)
             {
@@ -1791,7 +1878,7 @@ namespace OsEngine.Journal
             try
             {
                 if (volume == null ||
-      volume.Count == 0)
+                    volume.Count == 0)
                 {
                     return;
                 }
@@ -1984,9 +2071,582 @@ namespace OsEngine.Journal
 
         #endregion
 
+        #region Volume to Portfolio
+
+        private Chart _chartPortfolio;
+
+        private DataGridView _gridLeveragePortfolio;
+
+        private TableLayoutPanel _layoutPanelPortfolio;
+
+        private void CreateChartPortfolio()
+        {
+            try
+            {
+                _chartPortfolio = new Chart();
+                _chartPortfolio.Series.Clear();
+                _chartPortfolio.ChartAreas.Clear();
+                _chartPortfolio.BackColor = Color.FromArgb(17, 18, 23);
+                _chartPortfolio.Dock = DockStyle.Fill;
+
+                ChartArea areaLinePortfolio = new ChartArea("ChartAreaPortfolio");
+                areaLinePortfolio.Position.Height = 70;
+                areaLinePortfolio.Position.Width = 100;
+                areaLinePortfolio.Position.Y = 0;
+                areaLinePortfolio.CursorX.IsUserSelectionEnabled = true;
+                areaLinePortfolio.CursorX.IsUserEnabled = true;
+                areaLinePortfolio.AxisX.LabelStyle.Angle = 0;
+
+                _chartPortfolio.ChartAreas.Add(areaLinePortfolio);
+
+                ChartArea areaLineLeverageBar = new ChartArea("ChartAreaPortfolioBar");
+                areaLineLeverageBar.AlignWithChartArea = "ChartAreaPortfolio";
+                areaLineLeverageBar.Position.Height = 30;
+                areaLineLeverageBar.Position.Width = 100;
+                areaLineLeverageBar.Position.Y = 70;
+                areaLineLeverageBar.AxisX.Enabled = AxisEnabled.False;
+                areaLineLeverageBar.CursorX.IsUserEnabled = true;
+
+                _chartPortfolio.ChartAreas.Add(areaLineLeverageBar);
+
+                for (int i = 0; i < _chartPortfolio.ChartAreas.Count; i++)
+                {
+                    _chartPortfolio.ChartAreas[i].BorderColor = Color.Black;
+                    _chartPortfolio.ChartAreas[i].BackColor = Color.FromArgb(17, 18, 23);
+                    _chartPortfolio.ChartAreas[i].CursorY.LineColor = Color.Gainsboro;
+                    _chartPortfolio.ChartAreas[i].CursorX.LineColor = Color.Black;
+                    _chartPortfolio.ChartAreas[i].AxisX.TitleForeColor = Color.Gainsboro;
+                    _chartPortfolio.ChartAreas[i].AxisY.TitleForeColor = Color.Gainsboro;
+
+                    foreach (var axe in _chartPortfolio.ChartAreas[i].Axes)
+                    {
+                        axe.LabelStyle.ForeColor = Color.Gainsboro;
+                    }
+                }
+
+                _chartPortfolio.MouseMove += _chartPortfolio_MouseMove;
+                _chartPortfolio.MouseWheel += _chartPortfolio_MouseWheel;
+
+                _gridLeveragePortfolio = DataGridFactory.GetDataGridView(DataGridViewSelectionMode.FullRowSelect, DataGridViewAutoSizeRowsMode.None);
+
+                _gridLeveragePortfolio.AllowUserToResizeRows = false;
+                _gridLeveragePortfolio.AllowUserToResizeColumns = true;
+                _gridLeveragePortfolio.ColumnCount = 2;
+                _gridLeveragePortfolio.RowCount = 0;
+                _gridLeveragePortfolio.Dock = DockStyle.Fill;
+                _gridLeveragePortfolio.ScrollBars = ScrollBars.Vertical;
+
+                foreach (DataGridViewColumn column in _gridLeveragePortfolio.Columns)
+                {
+                    column.SortMode = DataGridViewColumnSortMode.NotSortable;
+                    column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+                    column.ReadOnly = true;
+                }
+
+                _gridLeveragePortfolio.Columns[0].HeaderText = OsLocalization.Journal.LeverageGridColumn0;
+                _gridLeveragePortfolio.Columns[1].HeaderText = OsLocalization.Journal.LeverageGridColumn1;
+
+                CustomDataGridViewCell cell0 = new CustomDataGridViewCell();
+                cell0.Style = _gridLeveragePortfolio.DefaultCellStyle;
+                cell0.AdvancedBorderStyle = new DataGridViewAdvancedBorderStyle
+                {
+                    Bottom = DataGridViewAdvancedCellBorderStyle.None,
+                    Top = DataGridViewAdvancedCellBorderStyle.None,
+                    Left = DataGridViewAdvancedCellBorderStyle.Inset,
+                    Right = DataGridViewAdvancedCellBorderStyle.Inset
+                };
+
+                _gridLeveragePortfolio.DataError += _gridLeveragePortfolio_DataError;
+
+                _layoutPanelPortfolio = new TableLayoutPanel();
+                _layoutPanelPortfolio.Dock = DockStyle.Fill;
+                _layoutPanelPortfolio.ColumnCount = 2;
+                _layoutPanelPortfolio.RowCount = 1;
+                _layoutPanelPortfolio.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 80));
+                _layoutPanelPortfolio.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));               
+                _layoutPanelPortfolio.Controls.Add(_chartPortfolio, 0, 0);
+                _layoutPanelPortfolio.Controls.Add(_gridLeveragePortfolio, 1, 0);
+
+                HostVolumePortfolio.Child = _layoutPanelPortfolio;
+                HostVolumePortfolio.Child.Show();
+            }
+            catch (Exception error)
+            {
+                SendNewLogMessage(error.ToString(), LogMessageType.Error);
+            }
+        }
+
+        private void _gridLeveragePortfolio_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        {
+            ServerMaster.SendNewLogMessage(e.ToString(), Logging.LogMessageType.Error);
+        }
+
+        private void _chartPortfolio_MouseWheel(object sender, MouseEventArgs e)
+        {
+            try
+            {
+                if (_chartPortfolio.ChartAreas[0].AxisX.ScaleView.IsZoomed)
+                {
+                    _chartPortfolio.ChartAreas[0].AxisX.ScaleView.ZoomReset();
+                }
+            }
+            catch (Exception error)
+            {
+                SendNewLogMessage(error.ToString(), LogMessageType.Error);
+            }
+        }
+
+        private void _chartPortfolio_MouseMove(object sender, MouseEventArgs e)
+        {
+            try
+            {
+                if (_chartPortfolio.Series == null
+                    || _chartPortfolio.Series.Count == 0)
+                {
+                    return;
+                }
+                if (_chartPortfolio.ChartAreas[0].AxisX.ScaleView.Size == double.NaN)
+                {
+                    return;
+                }
+
+                if (e.X == _lastMouseXValue)
+                {
+                    return;
+                }
+
+                _lastMouseXValue = e.X;
+
+                int curCountOfPoints = 0;
+
+                if (_chartPortfolio.ChartAreas[0].AxisX.ScaleView.IsZoomed)
+                {
+                    curCountOfPoints = Convert.ToInt32(_chartPortfolio.ChartAreas[0].AxisX.ScaleView.Size);
+                }
+                else
+                {
+                    curCountOfPoints = _chartPortfolio.Series[0].Points.Count;
+                }
+
+                double sizeArea = _chartPortfolio.ChartAreas[0].InnerPlotPosition.Size.Width;
+                double allSizeAbs = _chartPortfolio.Size.Width * (sizeArea / 100);
+
+                double onePointLen = allSizeAbs / curCountOfPoints;
+
+                double curMousePosAbs = e.X;
+
+                double curPointNum = curMousePosAbs / onePointLen - 1;
+
+                try
+                {
+                    if (Double.IsInfinity(curPointNum))
+                    {
+                        return;
+                    }
+
+                    curPointNum = Convert.ToDouble(Convert.ToInt32(curPointNum));
+                }
+                catch
+                {
+                    return;
+                }
+
+                int firstPoint = 0;
+
+                if (_chartPortfolio.ChartAreas[0].AxisX.ScaleView.IsZoomed)
+                {
+                    firstPoint = Convert.ToInt32(_chartPortfolio.ChartAreas[0].AxisX.ScaleView.Position);
+                    curPointNum = firstPoint + curPointNum;
+                }
+
+                if (_chartPortfolio.ChartAreas[0].CursorX.Position != curPointNum)
+                {
+                    _chartPortfolio.ChartAreas[0].CursorX.SetCursorPosition(curPointNum);
+                }
+                else
+                {
+                    return;
+                }
+
+                int numPointInt = Convert.ToInt32(curPointNum);
+
+                if (numPointInt <= 0)
+                {
+                    return;
+                }
+
+                for (int i = 0; i < _chartPortfolio.Series.Count; i++)
+                {
+                    if (_chartPortfolio.Series[i].Points.Count > _lastSeriesEquityChartPointWithLabel)
+                    {
+                        _chartPortfolio.Series[i].Points[_lastSeriesEquityChartPointWithLabel].Label = "";
+                    }
+                    if (_chartPortfolio.Series[i].Points.Count > numPointInt)
+                    {
+                        _chartPortfolio.Series[i].Points[numPointInt].Label
+                        = _chartPortfolio.Series[i].Points[numPointInt].AxisLabel + "\n" + Math.Round(_chartPortfolio.Series[i].Points[numPointInt].YValues[0], 2);
+                    }
+                }
+
+                _lastSeriesEquityChartPointWithLabel = numPointInt;
+            }
+            catch (Exception error)
+            {
+                SendNewLogMessage(error.ToString(), LogMessageType.Error);
+            }
+        }
+
+        private void PaintPortfolioOnChart(List<Position> positionsAll)
+        {
+            try
+            {
+                if (!GridTabPrime.Dispatcher.CheckAccess())
+                {
+                    GridTabPrime.Dispatcher.Invoke(
+                        new Action<List<Position>>(PaintPortfolioOnChart), positionsAll);
+                    return;
+                }
+
+                if (_chartPortfolio == null || _gridLeveragePortfolio == null)
+                {
+                    CreateChartPortfolio();
+                }
+
+                _chartPortfolio.Series.Clear();
+
+                if (positionsAll == null || positionsAll.Count == 0)
+                {
+                    return;
+                }
+
+                Series totalPortfolio = new Series("SeriesPortfolio");
+                totalPortfolio.ChartType = SeriesChartType.Line;
+                totalPortfolio.Color = Color.White;  
+                totalPortfolio.LabelForeColor = Color.White;
+                totalPortfolio.YAxisType = AxisType.Secondary;
+                totalPortfolio.ChartArea = "ChartAreaPortfolio";
+                totalPortfolio.BorderWidth = 4;
+                totalPortfolio.ShadowOffset = 2;                
+
+                Series volumePortfolio = new Series("SeriesVolumeToPortfolio");
+                volumePortfolio.ChartType = SeriesChartType.Line;
+                volumePortfolio.Color = Color.DeepSkyBlue;  
+                volumePortfolio.LabelForeColor = Color.DeepSkyBlue;
+                volumePortfolio.YAxisType = AxisType.Secondary;
+                volumePortfolio.ChartArea = "ChartAreaPortfolio";
+                volumePortfolio.BorderWidth = 2;
+                volumePortfolio.ShadowOffset = 2;
+
+                Series leverageBars = new Series("SeriesLeverageBar");
+                leverageBars.ChartType = SeriesChartType.Column;
+                leverageBars.YAxisType = AxisType.Secondary;
+                leverageBars.LabelForeColor = Color.White;
+                leverageBars.ChartArea = "ChartAreaPortfolioBar";
+                leverageBars.ShadowOffset = 2;
+
+                List<DateTime> allChange = new List<DateTime>();
+
+                for (int i = 0; i < positionsAll.Count; i++)
+                {
+                    Position pos = positionsAll[i];
+                    DateTime timeCreate = pos.TimeCreate;
+                    DateTime timeClose = pos.TimeClose;
+
+                    if (allChange.FindIndex(chnge => chnge == timeCreate) == -1)
+                    {
+                        allChange.Add(timeCreate);
+                    }
+
+                    if (pos.State == PositionStateType.Done)
+                    {
+                        if (allChange.FindIndex(chnge => chnge == timeClose) == -1)
+                        {
+                            allChange.Add(timeClose);
+                        }
+                    }
+                }
+
+                allChange = allChange.OrderBy(x => x).ToList();
+
+                decimal[] values = new decimal[allChange.Count];
+                List<decimal> volume = new(values);
+                List<decimal> deposit = new(values);
+
+                SortedDictionary<decimal, TimeSpan> leverageList = new();
+
+                for (int i = 0; i < positionsAll.Count; i++)
+                {
+                    Position pos = positionsAll[i];
+                    
+                    if (pos.MaxVolume == 0)
+                    {
+                        continue;
+                    }
+
+                    DateTime timeCreate = pos.TimeCreate;
+                    DateTime timeClose = pos.TimeClose;
+                                        
+                    int indexOpen = allChange.FindIndex(change => change == timeCreate);
+                    int indexClose = allChange.FindIndex(change => change == timeClose);
+
+                    if (indexOpen != -1)
+                    {
+                        if(pos.Lots != 0)
+                        {
+                            volume[indexOpen] += pos.MaxVolume * pos.EntryPrice * pos.Lots;
+                        }
+                        else
+                        {
+                            volume[indexOpen] += pos.MaxVolume * pos.EntryPrice;
+                        }
+                            
+                        deposit[indexOpen] = pos.PortfolioValueOnOpenPosition;
+                    }
+
+                    if (pos.State == PositionStateType.Done
+                        && indexClose != -1)
+                    {
+                        if (pos.Lots != 0)
+                        {
+                            volume[indexClose] -= pos.MaxVolume * pos.EntryPrice * pos.Lots;
+                        }
+                        else
+                        {
+                            volume[indexClose] -= pos.MaxVolume * pos.EntryPrice;
+                        }
+                        
+                        deposit[indexClose] = pos.PortfolioValueOnOpenPosition;
+                    }
+                }
+
+                List<decimal> volumeData = new();
+
+                for (int i = 0; i < volume.Count; i++)
+                {   
+                    if (i > 0)
+                    {
+                        volumeData.Add(volumeData[^1] + volume[i]);
+                    }
+                    else
+                    {
+                        volumeData.Add(volume[i]);
+                    }                    
+                }
+
+                decimal maxVolume = 0;
+                decimal minVolume = decimal.MaxValue;
+
+                for (int i = 0; i < allChange.Count; i++)
+                {
+                    decimal totalDataPoint = Math.Round(deposit[i],4);
+                    totalPortfolio.Points.AddXY(i, totalDataPoint);
+                    totalPortfolio.Points[^1].AxisLabel = allChange[i].ToString();
+
+                    decimal volumeDataPoint = Math.Round(volumeData[i],4);             
+                    volumePortfolio.Points.AddXY(i, volumeDataPoint);
+                    volumePortfolio.Points[^1].AxisLabel = allChange[i].ToString();
+
+                    decimal leverage = 0;
+
+                    if (totalDataPoint != 0)
+                    {
+                        leverage = Math.Round(volumeDataPoint / totalDataPoint, 2);
+                    }
+                    
+                    leverageBars.Points.AddXY(i, leverage);
+                    leverageBars.Points[^1].AxisLabel = allChange[i].ToString();
+
+                    leverageBars.Points[^1].Color = GetColorForLeverageLevel(leverageBars.Points[^1].YValues[0]);
+
+                    decimal leverageLevel = Math.Round(leverage, MidpointRounding.ToPositiveInfinity);
+
+                    if (leverage > 1 && leverage <= 1.5m)
+                    {
+                        leverageLevel = 1.5m;
+                    }
+                    else if (leverage > 1.5m && leverage <= 2)
+                    {
+                        leverageLevel = 2;
+                    }
+                    else if (leverage > 2 && leverage <= 2.5m)
+                    {
+                        leverageLevel = 2.5m;
+                    }
+                    else if (leverage > 2.5m && leverage <= 3)
+                    {
+                        leverageLevel = 3;
+                    }
+
+                    if (leverageLevel == 0)
+                    {
+                        leverageLevel = 1;
+                    }
+
+                    if (i < allChange.Count - 1)
+                    {
+                        if (leverageList.ContainsKey(leverageLevel))
+                        {
+                            leverageList[leverageLevel] += allChange[i + 1] - allChange[i];
+                        }
+                        else
+                        {
+                            leverageList[leverageLevel] = allChange[i + 1] - allChange[i];
+                        }
+                    }
+
+                    if (volumeData[i] > maxVolume)
+                    {
+                        maxVolume = volumeData[i];
+                    }
+                    if (volumeData[i] < minVolume)
+                    {
+                        minVolume = volumeData[i];
+                    }
+
+                    if (deposit[i] > maxVolume)
+                    {
+                        maxVolume = deposit[i];
+                    }
+                    if (deposit[i] < minVolume)
+                    {
+                        minVolume = deposit[i];
+                    }
+                }
+
+                if (minVolume != decimal.MaxValue &&
+                    maxVolume != 0 &&
+                    minVolume != maxVolume)
+                {
+                    double valueMax = Convert.ToDouble(maxVolume + (maxVolume * 0.05m));
+                    double valueMin = Convert.ToDouble(minVolume - (minVolume * 0.05m));
+
+                    valueMax = Math.Round(valueMax, 4);
+                    valueMin = Math.Round(valueMin, 4);
+
+                    if(valueMax > valueMin)
+                    {
+                        _chartPortfolio.ChartAreas["ChartAreaPortfolio"].AxisY2.Maximum = valueMax;
+                        _chartPortfolio.ChartAreas["ChartAreaPortfolio"].AxisY2.Minimum = valueMin;
+                        double interval = Convert.ToDouble(Math.Abs(maxVolume - minVolume) / 8);
+
+                        interval = Math.Round(interval, 4);
+
+                        _chartPortfolio.ChartAreas["ChartAreaPortfolio"].AxisY2.Interval = interval;
+
+                    }
+                }
+
+                _chartPortfolio.Series.Add(volumePortfolio);
+                _chartPortfolio.Series.Add(totalPortfolio);
+                _chartPortfolio.Series.Add(leverageBars);
+
+                AddDataToGridLeverage(leverageList);
+            }
+            catch (Exception error)
+            {
+                SendNewLogMessage(error.ToString(), LogMessageType.Error);
+            }
+        }
+
+        private Color GetColorForLeverageLevel(double value)
+        {
+            if (value < 1)
+            {
+                return Color.Green;
+            }
+            else if (value > 3)
+            {
+                return Color.Red;
+            }
+            else
+            {
+                return Color.Orange;
+            }
+        }
+
+        private void AddDataToGridLeverage(SortedDictionary<decimal, TimeSpan> leverageList)
+        {
+            try
+            {
+                if (!GridTabPrime.Dispatcher.CheckAccess())
+                {
+                    GridTabPrime.Dispatcher.Invoke(
+                        new Action<SortedDictionary<decimal, TimeSpan>>(AddDataToGridLeverage), leverageList);
+                    return;
+                }
+
+                if (leverageList == null || leverageList.Count == 0) return;
+
+                for (int i = 0; i < _gridLeveragePortfolio.RowCount; i++)
+                {
+                    _gridLeveragePortfolio.Rows.RemoveAt(i);
+                    i--;
+                }
+
+                int count = (int)leverageList.Keys.Max();
+
+                TimeSpan timeSpan = new TimeSpan(0);
+
+                foreach (var keys in leverageList)
+                {
+                    timeSpan += keys.Value;
+                }
+                
+                for (int i = 0; i < leverageList.Count; i++)
+                {
+                    DataGridViewRow newRow = new DataGridViewRow();
+
+                    string value = $"{i - 1} - {i}";
+
+                    decimal key = leverageList.Keys.ElementAt(i);
+
+                    switch (leverageList.Keys.ElementAt(i))
+                    {
+                        case 1:
+                            value = "0 - 1";
+                            break;
+                        case 1.5m:
+                            value = "1 - 1.5";
+                            break;
+                        case 2:
+                            value = "1.5 - 2";
+                            break;
+                        case 2.5m:
+                            value = "2 - 2.5";
+                            break;
+                        case 3:
+                            value = "2.5 - 3";
+                            break;
+                    }
+
+                    newRow.Cells.Add(new DataGridViewTextBoxCell() { Value = value });
+
+                    if (leverageList.ContainsKey(key))
+                    {
+                        newRow.Cells.Add(new DataGridViewTextBoxCell() { Value = Math.Round(leverageList[key].TotalSeconds / timeSpan.TotalSeconds * 100, 2) + "%" });
+                    }
+                    else
+                    {
+                        newRow.Cells.Add(new DataGridViewTextBoxCell() { Value = "0%" });
+                    }
+
+                    newRow.DefaultCellStyle.ForeColor = GetColorForLeverageLevel((double)key - 0.1);
+                    newRow.DefaultCellStyle.SelectionForeColor = newRow.DefaultCellStyle.ForeColor;
+
+                    _gridLeveragePortfolio.Rows.Add(newRow);
+                }
+            }
+            catch (Exception error)
+            {
+                SendNewLogMessage(error.ToString(), LogMessageType.Error);
+            }
+        }
+
+        #endregion
+
         #region Max DD Chart
 
-        Chart _chartDd;
+        private Chart _chartDd;
 
         private void CreateChartDrawDown()
         {
@@ -2006,6 +2666,8 @@ namespace OsEngine.Journal
                 areaDdPunct.Position.Y = 0;
                 areaDdPunct.CursorX.IsUserSelectionEnabled = false; //allow the user to change the view scope/ разрешаем пользователю изменять рамки представления
                 areaDdPunct.CursorX.IsUserEnabled = true; //trait/чертa
+                areaDdPunct.AxisY2.Title = OsLocalization.Journal.Label25;
+                areaDdPunct.AxisY2.TitleForeColor = Color.DeepSkyBlue;
 
                 _chartDd.ChartAreas.Add(areaDdPunct);
 
@@ -2016,6 +2678,8 @@ namespace OsEngine.Journal
                 areaDdPercent.Position.Y = 50;
                 areaDdPercent.AxisX.Enabled = AxisEnabled.False;
                 areaDdPercent.CursorX.IsUserEnabled = true; //trait/чертa
+                areaDdPercent.AxisY2.Title = OsLocalization.Journal.Label24;
+                areaDdPercent.AxisY2.TitleForeColor = Color.DarkOrange;
 
                 _chartDd.ChartAreas.Add(areaDdPercent);
 
@@ -3679,6 +4343,11 @@ namespace OsEngine.Journal
             try
             {
                 List<Journal> journals = new List<Journal>();
+
+                if(_botsJournals == null)
+                {
+                    return null;
+                }
 
                 for (int i = 0; i < _botsJournals.Count; i++)
                 {

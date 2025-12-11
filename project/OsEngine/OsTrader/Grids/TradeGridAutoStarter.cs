@@ -9,6 +9,7 @@ using OsEngine.Market;
 using OsEngine.OsTrader.Panels.Tab;
 using System;
 using System.Collections.Generic;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace OsEngine.OsTrader.Grids
 {
@@ -24,6 +25,16 @@ namespace OsEngine.OsTrader.Grids
 
         public decimal ShiftFirstPrice;
 
+        public bool StartGridByTimeOfDayIsOn = false;
+
+        public int StartGridByTimeOfDayHour = 14;
+
+        public int StartGridByTimeOfDayMinute = 15;
+
+        public int StartGridByTimeOfDaySecond = 0;
+
+        public bool SingleActivationMode = true;
+
         public string GetSaveString()
         {
             string result = "";
@@ -32,7 +43,11 @@ namespace OsEngine.OsTrader.Grids
             result += AutoStartPrice + "@";
             result += RebuildGridRegime + "@";
             result += ShiftFirstPrice + "@";
-            result += "@";
+            result += StartGridByTimeOfDayIsOn +"@";
+            result += StartGridByTimeOfDayHour + "@";
+            result += StartGridByTimeOfDayMinute + "@";
+            result += StartGridByTimeOfDaySecond + "@";
+            result += SingleActivationMode;
             result += "@";
             result += "@";
             result += "@";
@@ -54,6 +69,18 @@ namespace OsEngine.OsTrader.Grids
                 Enum.TryParse(values[2], out RebuildGridRegime);
                 ShiftFirstPrice = values[3].ToDecimal();
 
+                try
+                {
+                    StartGridByTimeOfDayIsOn = Convert.ToBoolean(values[4]);
+                    StartGridByTimeOfDayHour = Convert.ToInt32(values[5]);
+                    StartGridByTimeOfDayMinute = Convert.ToInt32(values[6]);
+                    StartGridByTimeOfDaySecond = Convert.ToInt32(values[7]);
+                    SingleActivationMode = Convert.ToBoolean(values[8]);
+                }
+                catch
+                {
+                    // ignore
+                }
             }
             catch (Exception e)
             {
@@ -67,49 +94,96 @@ namespace OsEngine.OsTrader.Grids
 
         public bool HaveEventToStart(TradeGrid grid)
         {
-            if(AutoStartRegime == TradeGridAutoStartRegime.Off)
+            if(AutoStartRegime != TradeGridAutoStartRegime.Off)
             {
-                return false;
+                List<Candle> candles = grid.Tab.CandlesAll;
+
+                if (candles == null
+                    || candles.Count == 0)
+                {
+                    return false;
+                }
+
+                decimal price = candles[candles.Count - 1].Close;
+
+                if (price == 0)
+                {
+                    return false;
+                }
+
+                if (AutoStartRegime == TradeGridAutoStartRegime.HigherOrEqual
+                    && price >= AutoStartPrice)
+                {
+                    string message = "Auto-start grid. \n";
+                    message += "Auto-starter price regime: " + AutoStartRegime.ToString() + "\n";
+                    message += "Auto-starter price: " + AutoStartPrice + "\n";
+                    message += "Market price: " + price;
+
+                    SendNewLogMessage(message, LogMessageType.Signal);
+
+                    if(SingleActivationMode == true)
+                    {
+                        AutoStartRegime = TradeGridAutoStartRegime.Off;
+                    }
+
+                    return true;
+                }
+                else if (AutoStartRegime == TradeGridAutoStartRegime.LowerOrEqual
+                    && price <= AutoStartPrice)
+                {
+                    string message = "Auto-start grid. \n";
+                    message += "Auto-starter price regime: " + AutoStartRegime.ToString() + "\n";
+                    message += "Auto-starter price: " + AutoStartPrice + "\n";
+                    message += "Market price: " + price;
+                    SendNewLogMessage(message, LogMessageType.Signal);
+
+                    if (SingleActivationMode == true)
+                    {
+                        AutoStartRegime = TradeGridAutoStartRegime.Off;
+                    }
+
+                    return true;
+                }
             }
 
-            List<Candle> candles = grid.Tab.CandlesAll;
-
-            if(candles == null 
-                || candles.Count == 0)
+            if (StartGridByTimeOfDayIsOn)
             {
-                return false;
-            }
+                DateTime time = grid.Tab.TimeServerCurrent;
 
-            decimal price = candles[candles.Count - 1].Close;
+                if(time != DateTime.MinValue)
+                {
+                    bool isActivate = false;
 
-            if(price == 0)
-            {
-                return false;
-            }
+                    if (time.Hour == StartGridByTimeOfDayHour
+                        && time.Minute == StartGridByTimeOfDayMinute
+                        && time.Second >= StartGridByTimeOfDaySecond)
+                    {
+                        isActivate = true;
+                    }
+                    else if (time.Hour == StartGridByTimeOfDayHour
+                        && time.Minute > StartGridByTimeOfDayMinute)
+                    {
+                        isActivate = true;
+                    }
+                    else if (time.Hour > StartGridByTimeOfDayHour)
+                    {
+                        isActivate = true;
+                    }
 
-            if(AutoStartRegime == TradeGridAutoStartRegime.HigherOrEqual
-                && price >= AutoStartPrice)
-            {
-                string message = "Auto-start grid. \n";
-                message += "Auto-starter regime: " + AutoStartRegime.ToString() + "\n";
-                message += "Auto-starter price: " + AutoStartPrice + "\n";
-                message += "Market price: " + price;
+                    if (isActivate == true)
+                    {
+                        string message = "Auto-start grid by time of day. \n";
+                        message += "Current server time: " + time.ToString();
+                        SendNewLogMessage(message, LogMessageType.Signal);
 
-                SendNewLogMessage(message, LogMessageType.Signal);
-                AutoStartRegime = TradeGridAutoStartRegime.Off;
-                return true;
-            }
-            else if(AutoStartRegime == TradeGridAutoStartRegime.LowerOrEqual
-                && price <= AutoStartPrice)
-            {
-                string message = "Auto-start grid. \n";
-                message += "Auto-starter regime: " + AutoStartRegime.ToString() + "\n";
-                message += "Auto-starter price: " + AutoStartPrice + "\n";
-                message += "Market price: " + price;
-                SendNewLogMessage(message, LogMessageType.Signal);
-                AutoStartRegime = TradeGridAutoStartRegime.Off;
+                        if (SingleActivationMode == true)
+                        {
+                            StartGridByTimeOfDayIsOn = false;
+                        }
 
-                return true;
+                        return true;
+                    }
+                }
             }
 
             return false;

@@ -8,6 +8,7 @@ using OsEngine.Language;
 using OsEngine.Logging;
 using OsEngine.Market;
 using OsEngine.Market.Servers;
+using OsEngine.Market.Servers.Atp;
 using OsEngine.OsTrader.Panels.Tab;
 using System;
 using System.Collections.Generic;
@@ -20,9 +21,10 @@ namespace OsEngine.OsTrader.Grids
     {
         #region Service
 
-        public TradeGrid(StartProgram startProgram, BotTabSimple tab)
+        public TradeGrid(StartProgram startProgram, BotTabSimple tab, int number)
         {
             Tab = tab;
+            Number = number;
 
             if(Tab.ManualPositionSupport != null)
             {
@@ -35,13 +37,13 @@ namespace OsEngine.OsTrader.Grids
             Tab.PositionProfitActivateEvent += Tab_PositionProfitActivateEvent;
             Tab.Connector.TestStartEvent += Connector_TestStartEvent;
 
+            Tab.PositionOpeningFailEvent += Tab_PositionOpeningFailEvent;
+            Tab.PositionClosingFailEvent += Tab_PositionClosingFailEvent;
+
             StartProgram = startProgram;
 
-            NonTradePeriods = new TradeGridNonTradePeriods();
+            NonTradePeriods = new TradeGridNonTradePeriods(tab.TabName+"Grid"+number);
             NonTradePeriods.LogMessageEvent += SendNewLogMessage;
-
-            NonTradeDays = new TradeGridNonTradeDays();
-            NonTradeDays.LogMessageEvent += SendNewLogMessage;
 
             StopBy = new TradeGridStopBy();
             StopBy.LogMessageEvent += SendNewLogMessage;
@@ -84,8 +86,6 @@ namespace OsEngine.OsTrader.Grids
 
         public TradeGridNonTradePeriods NonTradePeriods;
 
-        public TradeGridNonTradeDays NonTradeDays;
-
         public TradeGridStopBy StopBy;
 
         public TradeGridStopAndProfit StopAndProfit;
@@ -118,6 +118,8 @@ namespace OsEngine.OsTrader.Grids
             result += DelayInReal + "@";
             result += CheckMicroVolumes + "@";
             result += MaxDistanceToOrdersPercent + "@";
+            result += OpenOrdersMakerOnly + "@";
+            result += "@";
             result += "@";
 
             result += "%";
@@ -127,7 +129,7 @@ namespace OsEngine.OsTrader.Grids
             result += "%";
 
             // trade days
-            result += NonTradeDays.GetSaveString();
+            result += "";
             result += "%";
 
             // stop grid by event
@@ -199,11 +201,20 @@ namespace OsEngine.OsTrader.Grids
                     MaxDistanceToOrdersPercent = 1.5m;
                 }
 
+                try
+                {
+                    OpenOrdersMakerOnly = Convert.ToBoolean(values[14]);
+                }
+                catch
+                {
+                    OpenOrdersMakerOnly = true;
+                }
+
                 // non trade periods
                 NonTradePeriods.LoadFromString(array[1]);
 
                 // trade days
-                NonTradeDays.LoadFromString(array[2]);
+                // removed
 
                 // stop grid by event
                 StopBy.LoadFromString(array[3]);
@@ -240,19 +251,17 @@ namespace OsEngine.OsTrader.Grids
                 Tab.PositionStopActivateEvent -= Tab_PositionStopActivateEvent;
                 Tab.PositionProfitActivateEvent -= Tab_PositionProfitActivateEvent;
                 Tab.Connector.TestStartEvent -= Connector_TestStartEvent;
+                Tab.PositionOpeningFailEvent -= Tab_PositionOpeningFailEvent;
+                Tab.PositionClosingFailEvent -= Tab_PositionClosingFailEvent;
+
                 Tab = null;
             }
 
             if (NonTradePeriods != null)
             {
                 NonTradePeriods.LogMessageEvent -= SendNewLogMessage;
+                NonTradePeriods.Delete();
                 NonTradePeriods = null;
-            }
-
-            if (NonTradeDays != null)
-            {
-                NonTradeDays.LogMessageEvent -= SendNewLogMessage;
-                NonTradeDays = null;
             }
 
             if (StopBy != null)
@@ -320,19 +329,89 @@ namespace OsEngine.OsTrader.Grids
 
         private void Connector_TestStartEvent()
         {
-            List<TradeGridLine> lines = GridCreator.Lines;
-
-            if(lines == null)
+            try
             {
-                return;
-            }
+                List<TradeGridLine> lines = GridCreator.Lines;
 
-            for(int i = 0;i < lines.Count;i++)
+                if (lines == null)
+                {
+                    return;
+                }
+
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    lines[i].Position = null;
+                    lines[i].PositionNum = 0;
+                }
+            }
+            catch (Exception e)
             {
-                lines[i].Position = null;
-                lines[i].PositionNum = 0;
+                SendNewLogMessage(e.ToString(), LogMessageType.Error);
             }
+        }
 
+        private void Tab_PositionClosingFailEvent(Position position)
+        {
+            try
+            {
+                if (Regime != TradeGridRegime.Off)
+                {
+                    bool isInArray = false;
+
+                    for (int i = 0; i < GridCreator.Lines.Count; i++)
+                    {
+                        TradeGridLine line = GridCreator.Lines[i];
+
+                        if (line.Position != null
+                            && line.Position.Number == position.Number)
+                        {
+                            isInArray = true;
+                            break;
+                        }
+                    }
+
+                    if (isInArray)
+                    {
+                        ErrorsReaction.PositionClosingFailEvent(position);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                SendNewLogMessage(e.ToString(), LogMessageType.Error);
+            }
+        }
+
+        private void Tab_PositionOpeningFailEvent(Position position)
+        {
+            try
+            {
+                if (Regime != TradeGridRegime.Off)
+                {
+                    bool isInArray = false;
+
+                    for (int i = 0; i < GridCreator.Lines.Count; i++)
+                    {
+                        TradeGridLine line = GridCreator.Lines[i];
+
+                        if (line.Position != null
+                            && line.Position.Number == position.Number)
+                        {
+                            isInArray = true;
+                            break;
+                        }
+                    }
+
+                    if (isInArray)
+                    {
+                        ErrorsReaction.PositionOpeningFailEvent(position);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                SendNewLogMessage(e.ToString(), LogMessageType.Error);
+            }
         }
 
         public event Action NeedToSaveEvent;
@@ -390,6 +469,8 @@ namespace OsEngine.OsTrader.Grids
         public bool CheckMicroVolumes = true;
 
         public decimal MaxDistanceToOrdersPercent = 0;
+
+        public bool OpenOrdersMakerOnly = true;
 
         #endregion
 
@@ -516,7 +597,6 @@ namespace OsEngine.OsTrader.Grids
                     return;
                 }
 
-                _isDeleted = true;
                 GridCreator.DeleteGrid();
                 Save();
             }
@@ -546,6 +626,24 @@ namespace OsEngine.OsTrader.Grids
         {
             try
             {
+                for (int i = numbers.Count - 1; i > -1; i--)
+                {
+                    int curNumber = numbers[i];
+
+                    if (curNumber >= GridCreator.Lines.Count)
+                    {
+                        continue;
+                    }
+
+                    TradeGridLine line = GridCreator.Lines[curNumber];
+
+                    if (line.Position != null
+                        && line.Position.OpenActive)
+                    {
+                        Tab.CloseOrder(line.Position.OpenOrders[^1]);
+                    }
+                }
+
                 GridCreator.RemoveSelected(numbers);
                 Save();
             }
@@ -609,7 +707,7 @@ namespace OsEngine.OsTrader.Grids
 
         private void Tab_PositionOpeningSuccesEvent(Position position)
         {
-            if (Regime == TradeGridRegime.On)
+            if (Regime != TradeGridRegime.Off)
             {
                 bool isInArray = false;
 
@@ -671,6 +769,14 @@ namespace OsEngine.OsTrader.Grids
                 return;
             }
 
+            if(StartProgram == StartProgram.IsOsTrader)
+            {
+                if (Tab.IsNonTradePeriodInConnector == true)
+                {
+                    return;
+                }
+            }
+
             if(StartProgram == StartProgram.IsOsTrader 
                && ErrorsReaction.WaitOnStartConnectorIsOn == true)
             {
@@ -683,11 +789,15 @@ namespace OsEngine.OsTrader.Grids
                     {
                         return;
                     }
+                }
+            }
 
-                    if(aServer.IsNonTradePeriod == true)
-                    {
-                        return;
-                    }
+            if (StartProgram == StartProgram.IsOsTrader)
+            {// сбрасываем кол-во ошибок по утрам и на старте сессии
+
+                if(ErrorsReaction.TryResetErrorsAtStartOfDay(Tab.TimeServerCurrent) == true)
+                {
+                    Save();
                 }
             }
 
@@ -765,18 +875,17 @@ namespace OsEngine.OsTrader.Grids
 
                 // проверяем работу авто-стартера, если он включен
 
-                if (AutoStarter.AutoStartRegime == TradeGridAutoStartRegime.Off)
+                if (AutoStarter.AutoStartRegime == TradeGridAutoStartRegime.Off
+                    && AutoStarter.StartGridByTimeOfDayIsOn == false)
                 {
                     return;
                 }
 
                 DateTime serverTime = Tab.TimeServerCurrent;
 
-                TradeGridRegime tradeDaysRegime = NonTradeDays.GetNonTradeDaysRegime(serverTime);
                 TradeGridRegime nonTradePeriodsRegime = NonTradePeriods.GetNonTradePeriodsRegime(serverTime);
 
-                if(tradeDaysRegime != TradeGridRegime.On 
-                    || nonTradePeriodsRegime != TradeGridRegime.On)
+                if(nonTradePeriodsRegime != TradeGridRegime.On)
                 { // авто-старт не может быть включен, если сейчас не торговый период
                     return;
                 }
@@ -851,27 +960,15 @@ namespace OsEngine.OsTrader.Grids
 
             // 5 попытка смены режима если блокировано по времени или по дням
 
-            if (baseRegime == TradeGridRegime.On)
+            if (baseRegime != TradeGridRegime.Off)
             {
                 DateTime serverTime = Tab.TimeServerCurrent;
 
-                TradeGridRegime tradeDaysRegime = NonTradeDays.GetNonTradeDaysRegime(serverTime);
                 TradeGridRegime nonTradePeriodsRegime = NonTradePeriods.GetNonTradePeriodsRegime(serverTime);
 
                 if(nonTradePeriodsRegime != TradeGridRegime.On)
                 {
                     baseRegime = nonTradePeriodsRegime;
-
-                    if (baseRegime == TradeGridRegime.CloseForced)
-                    {
-                        Regime = baseRegime;
-                        Save();
-                        RePaintGrid();
-                    }
-                }
-                if(tradeDaysRegime != TradeGridRegime.On)
-                {
-                    baseRegime = tradeDaysRegime;
 
                     if (baseRegime == TradeGridRegime.CloseForced)
                     {
@@ -1478,6 +1575,8 @@ namespace OsEngine.OsTrader.Grids
 
         private void TrySetClosingOrders(decimal lastPrice)
         {
+            CheckWrongCloseOrders();
+
             List<TradeGridLine> linesOpenPoses = GetLinesWithOpenPosition();
 
             int startIndex = linesOpenPoses.Count - MaxCloseOrdersInMarket;
@@ -1529,7 +1628,43 @@ namespace OsEngine.OsTrader.Grids
                     }
                 }
 
-                Tab.CloseAtLimit(pos, line.PriceExit, volume);
+                Tab.CloseAtLimitUnsafe(pos, line.PriceExit, volume);
+            }
+        }
+
+
+        private void CheckWrongCloseOrders()
+        {
+            if(Tab.StartProgram != StartProgram.IsOsTrader)
+            {
+                return;
+            }
+
+            List<TradeGridLine> linesAll = GridCreator.Lines;
+
+            for (int i = 0; i < linesAll.Count; i++)
+            {
+                TradeGridLine curLine = linesAll[i];
+                Position pos = curLine.Position;
+                
+                if (pos == null)
+                {
+                    continue;
+                }
+
+                decimal volumePosOpen = pos.OpenVolume;
+
+                if (pos.CloseActive == true)
+                {
+                    Order orderToClose = pos.CloseOrders[^1];
+                    decimal volumeCloseOrder = orderToClose.Volume;
+                    decimal volumeExecuteCloseOrder = orderToClose.VolumeExecute;
+
+                    if (volumePosOpen != (volumeCloseOrder - volumeExecuteCloseOrder))
+                    {
+                        Tab.CloseOrder(orderToClose);
+                    }
+                }
             }
         }
 
@@ -1871,6 +2006,7 @@ namespace OsEngine.OsTrader.Grids
                 SendNewLogMessage(message, LogMessageType.Signal);
                 Regime = TradeGridRegime.Off;
                 RePaintGrid();
+                _needToSave = true;
             }
         }
 
@@ -2184,7 +2320,8 @@ namespace OsEngine.OsTrader.Grids
                     Position position = curLine.Position;
 
                     if(position != null 
-                        && position.OpenVolume > 0)
+                        && position.OpenVolume > 0
+                        && position.OpenActive == false)
                     {
                         continue;
                     }
@@ -2209,10 +2346,13 @@ namespace OsEngine.OsTrader.Grids
                         }
                     }
 
-                    if (curLine.PriceEnter <= lastPrice)
+                    if (OpenOrdersMakerOnly
+                        && curLine.PriceEnter > lastPrice)
                     {
-                        linesWithOrdersToOpenNeed.Add(curLine);
+                        continue;
                     }
+
+                    linesWithOrdersToOpenNeed.Add(curLine);
 
                     if (linesWithOrdersToOpenNeed.Count >= MaxOpenOrdersInMarket)
                     {
@@ -2229,7 +2369,8 @@ namespace OsEngine.OsTrader.Grids
                     Position position = curLine.Position;
 
                     if (position != null
-                        && position.OpenVolume > 0)
+                        && position.OpenVolume > 0
+                        && position.OpenActive == false)
                     {
                         continue;
                     }
@@ -2254,11 +2395,14 @@ namespace OsEngine.OsTrader.Grids
                         }
                     }
 
-                    if (curLine.PriceEnter >= lastPrice)
+                    if (OpenOrdersMakerOnly 
+                        && curLine.PriceEnter < lastPrice)
                     {
-                        linesWithOrdersToOpenNeed.Add(curLine);
+                        continue;
                     }
 
+                    linesWithOrdersToOpenNeed.Add(curLine);
+                    
                     if (linesWithOrdersToOpenNeed.Count >= MaxOpenOrdersInMarket)
                     {
                         break;
@@ -2308,6 +2452,13 @@ namespace OsEngine.OsTrader.Grids
 
         public void SendNewLogMessage(string message, LogMessageType type)
         {
+            if(type == LogMessageType.Error)
+            {
+                message = "Grid error. Bot: " + this.Tab.NameStrategy + "\n"
+                + "Security name: " + this.Tab.Connector.SecurityName + "\n"
+                + message;
+            }
+
             if (LogMessageEvent != null)
             {
                 LogMessageEvent(message, type);

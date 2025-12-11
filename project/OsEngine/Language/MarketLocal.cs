@@ -1105,27 +1105,6 @@ namespace OsEngine.Language
          "Eng:Expert advisor port. It is recommended to run the MT5 terminal and OsEngine on the same local machine_" +
          "Ru:Порт советника. Рекомендуется запускать терминал МТ5 и OsEngine на одной локальной машине_");
 
-
-        public string LabelCommissionType => OsLocalization.ConvertToLocString(
-            "Eng:Commission type_" +
-            "Ru:Тип комиссии_");
-
-        public string LabelCommissionValue => OsLocalization.ConvertToLocString(
-            "Eng:Commission value_" +
-            "Ru:Значение комиссии_");
-
-        public string TitleServerMasterUi => OsLocalization.ConvertToLocString(
-            "Eng:Router_" +
-            "Ru:Роутер_");
-
-        public string TabItem1 => OsLocalization.ConvertToLocString(
-            "Eng: Servers _" +
-            "Ru: Подключения _");
-
-        public string TabItem2 => OsLocalization.ConvertToLocString(
-            "Eng: Logging_" +
-            "Ru: Логирование _");
-
         public string Label268 => OsLocalization.ConvertToLocString(
         "Eng:A demo server where you can trade on a virtual account. If True, demo mode is enabled; if False, it's disabled. Separate public and private keys are required for demo mode_" +
         "Ru:Демонстрационный сервер, где можно поторговать на виртуальном счете. Если True - то демо режим включен, если False - выключен. Для демо нужно выписывать отдельные публичный и приватный ключи_");
@@ -1185,6 +1164,135 @@ namespace OsEngine.Language
         public string Label282 => OsLocalization.ConvertToLocString(
          "Eng:Shifts the time of candles, trades, market depth, and orders to a specific time._" +
          "Ru:Сдвигает время свечей, сделок, стакана и ордеров на определенное кол-во часов._");
+
+        public string Label283 => OsLocalization.ConvertToLocString(
+         "Eng:Connection terminated. No API Key. You must specify the api token. You can get it on the T-Invest website._" +
+         "Ru:Соединение прервано. Токена API нет. Необходимо указать токен api. Вы можете получить его на веб-сайте Т-Инвестиции_");
+
+        public string Label284 => OsLocalization.ConvertToLocString(
+         "Eng:Start T-Invest connection_" +
+         "Ru:Запускаем подключение к Т-Инвестиции_");
+
+        public string Label285 => OsLocalization.ConvertToLocString(
+         "Eng:Start T-Invest connection_" +
+         "Ru:Запускаем подключение к Т-Инвестиции_");
+
+        public string Label286 => OsLocalization.ConvertToLocString(
+         "Eng:The standard reconnect procedure has been started. Connection will be restored in one minute. Reason is Delay in response from the API server. Stream _" +
+         "Ru:Запущена процедура штатного переподключения. Через минуту связь восстановится. Причина в задержка с ответом от сервера API. Поток _");
+
+        public string Label287 => OsLocalization.ConvertToLocString(
+         "Eng:Securities loaded. Count: _" +
+         "Ru:Бумаги для торгов подгружены. Количество: _");
+
+        public string Label288 => OsLocalization.ConvertToLocString(
+        "Eng:An error occurred in the security request method. Reconnect the connector. This is most likely a connection issue with the internet, and everything will be fine. If this happens again, please provide the following error message to the terminal support team _" +
+        "Ru:Ошибка в методе запроса бумаг. Переподключаем коннектор. Скорее всего это разрыв связи интернет и всё будет хорошо через минуту. Если это повторится, текст ошибки для поддержки терминала _");
+
+        public string Label289 => OsLocalization.ConvertToLocString(
+         "Eng:Error in the initial API connection method. Reconnect the connector. This is most likely a network connection issue, and everything will be fine in a minute. If this happens again, please provide the following error message to the terminal support team _" +
+         "Ru:Ошибка в методе первичного подключения к АПИ. Переподключаем коннектор. Скорее всего это разрыв связи интернет и всё будет хорошо через минуту. Если это повторится, текст ошибки для поддержки терминала _");
+
+        public string Label290 => OsLocalization.ConvertToLocString(
+         "Eng:Error in the get portfolio method. Reconnect the connector. This is most likely a network connection issue, and everything will be fine in a minute. If this happens again, please provide the following error message to the terminal support team _" +
+         "Ru:Ошибка в методе запроса портфеля. Переподключаем коннектор. Скорее всего это разрыв связи интернет и всё будет хорошо через минуту. Если это повторится, текст ошибки для поддержки терминала _");
+
+        public string Label291 => OsLocalization.ConvertToLocString(
+         "Eng:An error occurred while placing an order. Most likely, the error text contains the reason for the error. Error _" +
+         "Ru:Ошибка при выставлении ордера. _");
+
+        public string Label292 => OsLocalization.ConvertToLocString(
+         "Eng:Numerous attempts to withdraw the order. _" +
+         "Ru:Многочисленная попытка отозвать ордер.  _");
+
+        public string Label293 => OsLocalization.ConvertToLocString(
+         "Eng:An error occurred while cancel an order. Most likely, the error text contains the reason for the error. Error _" +
+         "Ru:Ошибка при отзыве ордера. _");
+
+        public string Label294 => OsLocalization.ConvertToLocString(
+         "Eng:The GRPC API stream has an error. Restart the connection. This will take less than a minute and everything is probably fine. If the error happens again, you should contact support. Stream name _" +
+         "Ru:Стрим GRPC API выдал ошибку. Перезапускаем подключение. Это займёт меньше минуты и скорее всего всё в порядке. Если ошибка повторяется непрерывно, надо обратиться в поддержку. Имя стрима _");
+
+        public string Label295 => OsLocalization.ConvertToLocString(
+         "Eng:A soft re-subscription to the GRPC stream has been detected. No connector restart is required. Stream _" +
+         "Ru:Зафиксирована мягкая переподписка на стрим GRPC. Перезапуск коннектора не требуется. Стрим _");
+
+        public string Label296 => OsLocalization.ConvertToLocString(
+         "Eng:Reconnecting the terminal to the T-Investments API. Several reconnections per day are normal. If you see this constantly, it is recommended to contact support. You can view the details of the program's operation in the connector log._" +
+         "Ru:Переподключаем терминал к АПИ Т-Инвестиции, это занимает минуту. Несколько переподключений в день норма. Если Вы видите это постоянно, рекомендуется написать в поддержку. Подробности работы программы первично можно посмотреть в логе коннектора. _");
+
+        public string Label297 => OsLocalization.ConvertToLocString(
+         "Eng:Security Subscribe error. Sending to next attempt. Attempt number_" +
+         "Ru:Ошибка в подписке бумаги. Отправляем на следующую попытку. Попытка номер _");
+
+        public string Label298 => OsLocalization.ConvertToLocString(
+         "Eng:Security Subscribe error. After three attempts, we still haven't subscribed. We're going to reconnect the connector. Security _" +
+         "Ru:Ошибка в подписке бумаги. После трёх попыток всё ещё не подписались. Уходим на переподключение коннектора. Бумага _");
+
+        public string Label299 => OsLocalization.ConvertToLocString(
+         "Eng:Unfortunately, Windows 7 does not support this connector. You need to update your operating system to version 10 or higher. _" +
+         "Ru:К сожалению Windows 7, данный коннектор не поддерживает. Вам надо обновить операционную систему до 10 версии или выше. _");
+
+        public string Label300 => OsLocalization.ConvertToLocString(
+         "Eng:Your connection token does not support trading operations. You need to issue a new token on the T-Investments website. Select the \"Trading\" option. Then connect using the new token. _" +
+         "Ru:Ваш токен подключения не поддерживает торговые операции. Необходимо выписать новый токен на сайте Т-Инвестиции. Указав галочку ТОРГОВЛЯ. И подключаться через него. _");
+
+        public string Label301 => OsLocalization.ConvertToLocString(
+         "Eng:There is not enough money in the portfolio for the operation _" +
+         "Ru:На счёте недостаточно средств для операции. _");
+
+        public string Label302 => OsLocalization.ConvertToLocString(
+         "Eng:The price is too high_" +
+         "Ru:Цена слишком высока _");
+
+        public string Label303 => OsLocalization.ConvertToLocString(
+         "Eng:Price_" +
+         "Ru:Цена_");
+
+        public string Label304 => OsLocalization.ConvertToLocString(
+         "Eng:The price is outside the limits_" +
+         "Ru:Цена за пределами лимита по инструменту_");
+
+        public string Label305 => OsLocalization.ConvertToLocString(
+         "Eng:Unable to download the list of securities. We are reconnecting the connector. This may be a temporary issue due to a lack of internet connection, and the connection will be restored in a few minutes. Or you have blocked requests to the Internet. Try to run the application from the Administrator or disable the antivirus_" +
+         "Ru:Не удаётся скачать список бумаг. Уходим на переподключение коннектора. Это может быть разовая проблема из-за отсутствия интернета, тогда через пару минут связь восстановится. Либо у Вас заблокированы запросы в Интернет. Пробуйте запустить приложение от Администратора или отключить антивирус_");
+
+        public string Label306 => OsLocalization.ConvertToLocString(
+         "Eng:If true is enabled, all downloaded papers will be saved to a file the first time the connector is started, and the next time the connector is restarted within 1 hour, the data will be downloaded from the file. If false, the data will be loaded from the MT5 terminal each time. Use true when the broker provides several thousand securities for trading._" +
+         "Ru:Если включен true, то при первом запуске коннектора все загруженные бумаги будут записаны в файл и при следующих запусках коннектора в течении 1 часа данные будут загружены из файла. Если false, то каждый раз данные будут грузиться с терминала МТ5. Используйте true когда брокер предоставляет несколько тысяч бумаг для торгов._");
+
+        public string Label307 => OsLocalization.ConvertToLocString(
+          "Eng:Trading mode_" +
+          "Ru:Режим торгов_");
+
+        public string Label308 => OsLocalization.ConvertToLocString(
+          "Eng:Trading mode on the Moscow Stock Exchange. Affects the display of the portfolio, accounts and positions_" +
+          "Ru:Режим торгов на Московской бирже. Влияет на отображение портфеля, счетов и позиций_");
+
+
+
+
+
+
+        public string LabelCommissionType => OsLocalization.ConvertToLocString(
+            "Eng:Commission type_" +
+            "Ru:Тип комиссии_");
+
+        public string LabelCommissionValue => OsLocalization.ConvertToLocString(
+            "Eng:Commission value_" +
+            "Ru:Значение комиссии_");
+
+        public string TitleServerMasterUi => OsLocalization.ConvertToLocString(
+            "Eng:Router_" +
+            "Ru:Роутер_");
+
+        public string TabItem1 => OsLocalization.ConvertToLocString(
+            "Eng: Servers _" +
+            "Ru: Подключения _");
+
+        public string TabItem2 => OsLocalization.ConvertToLocString(
+            "Eng: Logging_" +
+            "Ru: Логирование _");
 
         // Servers
 

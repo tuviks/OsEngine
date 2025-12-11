@@ -80,6 +80,7 @@ namespace OsEngine.Market.Servers
                 _serverRealization.PortfolioEvent += _serverRealization_PortfolioEvent;
                 _serverRealization.SecurityEvent += _serverRealization_SecurityEvent;
                 _serverRealization.LogMessageEvent += SendLogMessage;
+                _serverRealization.ForceCheckOrdersAfterReconnectEvent += _serverRealization_ForceCheckOrdersAfterReconnect;
 
                 _serverRealization.NewsEvent += _serverRealization_NewsEvent;
 
@@ -104,7 +105,7 @@ namespace OsEngine.Market.Servers
                 _needToSaveCandlesParam.ValueChange += SaveCandleHistoryParam_ValueChange;
                 ServerParameters[2].Comment = OsLocalization.Market.Label89;
 
-                CreateParameterInt(OsLocalization.Market.ServerParam6, 500);
+                CreateParameterInt(OsLocalization.Market.ServerParam6, 900);
                 _needToLoadCandlesCountParam = (ServerParameterInt)ServerParameters[ServerParameters.Count - 1];
                 _needToLoadCandlesCountParam.ValueChange += _needToLoadCandlesCountParam_ValueChange;
                 ServerParameters[3].Comment = OsLocalization.Market.Label90;
@@ -367,7 +368,7 @@ namespace OsEngine.Market.Servers
         /// <summary>
         /// create STRING server parameter
         /// </summary>
-        public void CreateParameterString(string name, string param)
+        public ServerParameterString CreateParameterString(string name, string param)
         {
             ServerParameterString newParam = new ServerParameterString();
             newParam.Name = name;
@@ -384,12 +385,14 @@ namespace OsEngine.Market.Servers
             }
 
             newParam.ValueChange += userChangeParameter_ValueChange;
+
+            return newParam;
         }
 
         /// <summary>
         /// create INT server parameter
         /// </summary>
-        public void CreateParameterInt(string name, int param)
+        public ServerParameterInt CreateParameterInt(string name, int param)
         {
             ServerParameterInt newParam = new ServerParameterInt();
             newParam.Name = name;
@@ -406,12 +409,14 @@ namespace OsEngine.Market.Servers
             }
 
             newParam.ValueChange += userChangeParameter_ValueChange;
+
+            return newParam;
         }
 
         /// <summary>
         /// create ENUM server parameter
         /// </summary>
-        public void CreateParameterEnum(string name, string value, List<string> collection)
+        public ServerParameterEnum CreateParameterEnum(string name, string value, List<string> collection)
         {
             ServerParameterEnum newParam = new ServerParameterEnum();
             newParam.Name = name;
@@ -429,12 +434,14 @@ namespace OsEngine.Market.Servers
             }
 
             newParam.ValueChange += userChangeParameter_ValueChange;
+
+            return newParam;
         }
 
         /// <summary>
         /// create DECIMAL server parameter
         /// </summary>
-        public void CreateParameterDecimal(string name, decimal param)
+        public ServerParameterDecimal CreateParameterDecimal(string name, decimal param)
         {
             ServerParameterDecimal newParam = new ServerParameterDecimal();
             newParam.Name = name;
@@ -451,12 +458,14 @@ namespace OsEngine.Market.Servers
             }
 
             newParam.ValueChange += userChangeParameter_ValueChange;
+
+            return newParam;
         }
 
         /// <summary>
         /// create BOOL server parameter
         /// </summary>
-        public void CreateParameterBoolean(string name, bool param)
+        public ServerParameterBool CreateParameterBoolean(string name, bool param)
         {
             ServerParameterBool newParam = new ServerParameterBool();
             newParam.Name = name;
@@ -474,12 +483,14 @@ namespace OsEngine.Market.Servers
 
 
             newParam.ValueChange += userChangeParameter_ValueChange;
+
+            return newParam;
         }
 
         /// <summary>
         /// create PASSWORD server parameter
         /// </summary>
-        public void CreateParameterPassword(string name, string param)
+        public ServerParameterPassword CreateParameterPassword(string name, string param)
         {
             ServerParameterPassword newParam = new ServerParameterPassword();
             newParam.Name = name;
@@ -496,12 +507,14 @@ namespace OsEngine.Market.Servers
             }
 
             newParam.ValueChange += userChangeParameter_ValueChange;
+
+            return newParam;
         }
 
         /// <summary>
         /// create PATH TO FILE server parameter
         /// </summary>
-        public void CreateParameterPath(string name)
+        public ServerParameterPath CreateParameterPath(string name)
         {
             ServerParameterPath newParam = new ServerParameterPath();
             newParam.Name = name;
@@ -517,12 +530,14 @@ namespace OsEngine.Market.Servers
             }
 
             newParam.ValueChange += userChangeParameter_ValueChange;
+
+            return newParam;
         }
 
         /// <summary>
         /// create Button server parameter
         /// </summary>
-        public void CreateParameterButton(string name)
+        public ServerParameterButton CreateParameterButton(string name)
         {
             ServerParameterButton newParam = new ServerParameterButton();
             newParam.Name = name;
@@ -538,6 +553,8 @@ namespace OsEngine.Market.Servers
             }
 
             newParam.ValueChange += userChangeParameter_ValueChange;
+
+            return newParam;
         }
 
         /// <summary>
@@ -2323,20 +2340,22 @@ namespace OsEngine.Market.Servers
 
                     for (int i = 0; _securities != null && i < _securities.Count; i++)
                     {
-                        if (_securities[i] == null)
+                        Security securityCurrent = _securities[i];
+
+                        if (securityCurrent == null)
                         {
                             continue;
                         }
-                        if (_securities[i].Name == securityName &&
-                            (_securities[i].NameClass == securityClass))
+                        if (securityCurrent.Name == securityName &&
+                            (securityCurrent.NameClass == securityClass))
                         {
-                            security = _securities[i];
+                            security = securityCurrent;
                             break;
                         }
-                        if (_securities[i].Name == securityName &&
+                        if (securityCurrent.Name == securityName &&
                             (securityClass == null))
                         {
-                            security = _securities[i];
+                            security = securityCurrent;
                             break;
                         }
                     }
@@ -2419,6 +2438,12 @@ namespace OsEngine.Market.Servers
         /// </summary>
         private void _candleManager_CandleUpdateEvent(CandleSeries series)
         {
+            if (series.IsMergedByCandlesFromFile == false 
+                && series.CandleCreateMethodType == "TimeShiftCandle")
+            {
+                series.IsMergedByCandlesFromFile = true;
+            }
+
             if (series.IsMergedByCandlesFromFile == false)
             {
                 series.IsMergedByCandlesFromFile = true;
@@ -3055,11 +3080,6 @@ namespace OsEngine.Market.Servers
                     myDepth.Bids.Count == 0))
                 {
                     return;
-                }
-
-                if (myDepth.SecurityNameCode == "LQDT")
-                {
-
                 }
 
                 TrySendMarketDepthEvent(myDepth);
@@ -4058,6 +4078,18 @@ namespace OsEngine.Market.Servers
             catch (Exception ex)
             {
                 SendLogMessage(ex.ToString(), LogMessageType.Error);
+            }
+        }
+
+        private void _serverRealization_ForceCheckOrdersAfterReconnect()
+        {
+            try
+            {
+                _ordersHub.ForceCheckOrdersAfterReconnect();
+            }
+            catch
+            {
+                // ignore
             }
         }
 

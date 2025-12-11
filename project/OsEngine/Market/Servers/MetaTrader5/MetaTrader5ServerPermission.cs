@@ -51,7 +51,7 @@
 
         public bool DataFeedTfMarketDepthCanLoad
         {
-            get { return false; }
+            get { return true; }
         }
 
         public bool DataFeedTf1MinuteCanLoad
@@ -264,7 +264,7 @@
             get { return 10; }
         }
 
-        public string[] IpAddresServer
+        public string[] IpAddressServer
         {
             get { return null; }
         }

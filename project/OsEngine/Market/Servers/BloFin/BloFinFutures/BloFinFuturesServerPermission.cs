@@ -162,7 +162,7 @@ namespace OsEngine.Market.Servers.BloFin
 
         public bool IsUseLotToCalculateProfit
         {
-            get { return true; }
+            get { return false; }
         }
 
         public bool ManuallyClosePositionOnBoard_IsOn
@@ -177,7 +177,7 @@ namespace OsEngine.Market.Servers.BloFin
                 string[] values = new string[]
                 {
                     "_LONG",
-                    "_SHORT",
+                    "_SHORT"
                 };
 
                 return values;
@@ -271,7 +271,7 @@ namespace OsEngine.Market.Servers.BloFin
             get { return 10; }
         }
 
-        public string[] IpAddresServer
+        public string[] IpAddressServer
         {
             get
             {

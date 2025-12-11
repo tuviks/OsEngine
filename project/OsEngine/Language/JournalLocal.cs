@@ -152,8 +152,19 @@ namespace OsEngine.Language
          "Ru:Фильтр по бумагам_");
 
         public string Label23 => OsLocalization.ConvertToLocString(
-            "Eng:Benchmark_" +
-            "Ru:Бенчмарк_");
+         "Eng:Benchmark_" +
+         "Ru:Бенчмарк_");
+
+        public string Label24 => OsLocalization.ConvertToLocString(
+         "Eng:P E R C E N T_" +
+         "Ru:П Р О Ц Е Н Т Ы_");
+
+        public string Label25 => OsLocalization.ConvertToLocString(
+         "Eng:A B S O L U T E_" +
+         "Ru:А Б С О Л Ю Т_");
+
+
+
 
         public string TabItem1 => OsLocalization.ConvertToLocString(
             "Eng:Equity_" +
@@ -283,5 +294,20 @@ namespace OsEngine.Language
              "Eng:Are you sure you want to close all positions at market?_" +
              "Ru:Вы уверены что хотите закрыть все позиции по маркету?_");
 
+        public string TabItemSecurities => OsLocalization.ConvertToLocString(
+            "Eng:Securities_" +
+            "Ru:Инструменты_");
+
+        public string TabItemPortfolio => OsLocalization.ConvertToLocString(
+            "Eng:To portfolio_" +
+            "Ru:К портфелю_");
+
+        public string LeverageGridColumn0 => OsLocalization.ConvertToLocString(
+            "Eng:Leverage_" +
+            "Ru:Плечо_");
+
+        public string LeverageGridColumn1 => OsLocalization.ConvertToLocString(
+            "Eng:Time at %_" +
+            "Ru:Время в %_");
     }
 }

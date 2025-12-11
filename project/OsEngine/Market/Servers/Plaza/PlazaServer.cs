@@ -9,7 +9,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
-using System.Text;
 using System.Threading;
 using Message = ru.micexrts.cgate.message.Message;
 
@@ -25,7 +24,7 @@ namespace OsEngine.Market.Servers.Plaza
             CreateParameterString(OsLocalization.Market.ServerParamPublicKey, "11111111");
             CreateParameterInt("Max orders per second", 30);
             CreateParameterBoolean("Cancel on disconnect", true);
-            CreateParameterInt("p2lrpcq or p2tcp", 1);
+            CreateParameterEnum("Connection type", "p2lrpcq", new List<string> { "p2tcp", "p2lrpcq" });
         }
     }
 
@@ -38,15 +37,15 @@ namespace OsEngine.Market.Servers.Plaza
             ServerStatus = ServerConnectStatus.Disconnect;
             _statusNeeded = ServerConnectStatus.Disconnect;
 
-            _threadPrime = new Thread(PrimeWorkerThreadSpace);
-            _threadPrime.CurrentCulture = new CultureInfo("ru-RU");
-            _threadPrime.IsBackground = true;
-            _threadPrime.Start();
+            Thread worker1 = new Thread(PrimeWorkerThreadSpace);
+            worker1.CurrentCulture = new CultureInfo("ru-RU");
+            worker1.IsBackground = true;
+            worker1.Start();
 
-            _heartBeatSenderThread = new Thread(HeartBeatSender);
-            _heartBeatSenderThread.CurrentCulture = new CultureInfo("ru-RU");
-            _heartBeatSenderThread.IsBackground = true;
-            _heartBeatSenderThread.Start();
+            Thread worker2 = new Thread(HeartBeatSender);
+            worker2.CurrentCulture = new CultureInfo("ru-RU");
+            worker2.IsBackground = true;
+            worker2.Start();
         }
 
         public void Connect(WebProxy proxy)
@@ -54,7 +53,7 @@ namespace OsEngine.Market.Servers.Plaza
             string key = ((ServerParameterString)ServerParameters[0]).Value;
             int limitation = ((ServerParameterInt)ServerParameters[1]).Value;
             _COD = ((ServerParameterBool)ServerParameters[2]).Value;
-            int connectionType = ((ServerParameterInt)ServerParameters[3]).Value;
+            string connectionType = ((ServerParameterEnum)ServerParameters[3]).Value;
 
             _rateGate = new RateGate(1, TimeSpan.FromMilliseconds(1000 / limitation));
 
@@ -89,13 +88,13 @@ namespace OsEngine.Market.Servers.Plaza
             // Creating a connection to the router | Создание соединения с роутером
             try
             {
-                if (connectionType == 1)
+                if (connectionType == "p2tcp")
                 {
-                    Connection = new Connection(ConnectionOpenString_p2lrpcq);
+                    Connection = new Connection(ConnectionOpenString_p2tcp);
                 }
                 else
                 {
-                    Connection = new Connection(ConnectionOpenString_p2tcp);
+                    Connection = new Connection(ConnectionOpenString_p2lrpcq);
                 }
             }
             catch (CGateException error)
@@ -320,9 +319,9 @@ namespace OsEngine.Market.Servers.Plaza
                     _publisher = null;
                 }
 
-                _rebildDepths = null;
                 _marketDepths = new List<MarketDepth>();
-                _marketDepthsRevisions = null;
+                _lastRevisions = null;
+                _currentOrders = new List<Order>();
                 _ordersToExecute = new Queue<Order>();
                 _ordersToCansel = new Queue<Order>();
                 _ordersToChange = new Queue<Order>();
@@ -364,25 +363,13 @@ namespace OsEngine.Market.Servers.Plaza
 
         public event Action DisconnectEvent;
 
+        public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
+
         #endregion
 
         #region 2 Properties, Connection strings
 
         private RateGate _rateGate;
-
-        /// <summary>
-		/// thread responsible for connecting to Plaza, monitoring threads and processing incoming data
-        /// поток отвечающий за соединение с плазой, следящий за потоками и обрабатывающий входящие данные
-        /// </summary>
-        private Thread _threadPrime;
-
-        /// <summary>
-        /// CODHeartbeat thread. COD - specially ordered service from a broker. Allows you to delete all active orders of your login when the connection with your program is broken
-        /// It works as well - while signals from the program are being sent - everything is ok. How to stop - the exchange cancels all orders. | 
-        /// Поток отправляющий CODHeartbeat.COD - специально заказываемая услуга у брокера. Позволяет при обрыве связи с Вашей программой удалять все активные заявки Вашего логина
-        /// Работает так- пока сигналы из программы идут - всё ок. Как прекращаются - биржа кроет все заявки.
-        /// </summary>
-        private Thread _heartBeatSenderThread;
 
         /// <summary>
         /// a flag indicating whether the connection to CGate is open or not |
@@ -418,6 +405,8 @@ namespace OsEngine.Market.Servers.Plaza
 
         private object _publisherLocker = new object();
 
+        private object _currentOrdersLosker = new object();
+
         /// <summary>
         /// if the limit on the number of applications per second is exceeded, the system blocks the acceptance of new applications for a certain time |
         /// при превышении ограничения по количеству заявок в секунду, система блокирует на определенное время прием новых заявок
@@ -431,6 +420,8 @@ namespace OsEngine.Market.Servers.Plaza
         /// очередь заявок на исполнение
         /// </summary>
         private Queue<Order> _ordersToExecute;
+
+        private List<Order> _currentOrders;
 
         /// <summary>
 		/// order queue for cancellation |
@@ -1312,7 +1303,7 @@ namespace OsEngine.Market.Servers.Plaza
 
                 SendLogMessage($"Publisher error. Reconnect.", LogMessageType.System);
 
-                Dispose(); 
+                Dispose();
                 Connect(null);
             }
 
@@ -1731,6 +1722,7 @@ namespace OsEngine.Market.Servers.Plaza
                                     security.NameId = replmsg["isin_id"].asInt().ToString();
                                     security.State = SecurityStateType.Activ;
                                     security.VolumeStep = 1;
+									security.Expiration = replmsg["last_trade_date"].asDateTime();
                                     security.Exchange = "MOEX";
 
                                     security.PriceStep = Convert.ToDecimal(replmsg["min_step"].asDecimal());
@@ -1739,7 +1731,7 @@ namespace OsEngine.Market.Servers.Plaza
                                     security.PriceLimitLow = Convert.ToDecimal(replmsg["settlement_price"].asDecimal()) - Convert.ToDecimal(replmsg["limit_down"].asDecimal());
                                     security.PriceLimitHigh = Convert.ToDecimal(replmsg["settlement_price"].asDecimal()) + Convert.ToDecimal(replmsg["limit_up"].asDecimal());
 
-                                    security.Lot = replmsg["lot_volume"].asInt(); //Convert.ToDecimal(replmsg["lot_volume"].asInt());
+                                    security.Lot = 1;
 
                                     security.SecurityType = SecurityType.Futures;
 
@@ -1808,12 +1800,6 @@ namespace OsEngine.Market.Servers.Plaza
         }
 
         /// <summary>
-        /// depths that have been updated for the previous data series and mailing these depths is required |
-        /// стаканы которые обновились за предыдущую серию данных и требуется рассылка этих стаканов
-        /// </summary>
-        private List<MarketDepth> _rebildDepths;
-
-        /// <summary>
 		/// depth is processed here
         /// здесь обрабатывается стакан
         /// </summary>
@@ -1853,28 +1839,9 @@ namespace OsEngine.Market.Servers.Plaza
                                         return 0;
                                     }
 
-                                    if (_rebildDepths == null)
+                                    if (MarketDepthEvent != null)
                                     {
-                                        _rebildDepths = new List<MarketDepth>();
-                                    }
-
-                                    if (_rebildDepths.Find(depth => depth.SecurityNameCode == myDepth.SecurityNameCode) == null)
-                                    {
-                                        _rebildDepths.Add(myDepth.GetCopy());
-                                    }
-
-                                    if (_rebildDepths != null && _rebildDepths.Count != 0)
-                                    {
-                                        for (int i = 0; i < _rebildDepths.Count; i++)
-                                        {
-                                            if (MarketDepthEvent != null && _rebildDepths[i] != null &&
-                                                _rebildDepths[i].Bids != null && _rebildDepths[i].Bids.Count != 0 &&
-                                                _rebildDepths[i].Asks != null && _rebildDepths[i].Asks.Count != 0)
-                                            {
-                                                MarketDepthEvent(_rebildDepths[i]);
-                                            }
-                                        }
-                                        _rebildDepths.Clear();
+                                        MarketDepthEvent(myDepth);
                                     }
                                 }
                                 catch (Exception error)
@@ -1953,7 +1920,7 @@ namespace OsEngine.Market.Servers.Plaza
             }
         }
 
-        private List<RevisionInfo> _marketDepthsRevisions;
+        private List<RevisionInfo> _lastRevisions;
 
         private List<MarketDepth> _marketDepths;
 
@@ -1968,21 +1935,21 @@ namespace OsEngine.Market.Servers.Plaza
             revision.ReplId = replmsg["replID"].asLong(); // уникальный идентификатор записи в таблице. При вставке каждой новой записи, этой записи присваивается уникальный идентификатор
             revision.Security = security.Name;
 
-            if (_marketDepthsRevisions == null)
+            if (_lastRevisions == null)
             {
-                _marketDepthsRevisions = new List<RevisionInfo>();
+                _lastRevisions = new List<RevisionInfo>();
             }
 
             // remove at the same price, if any | удаляем по этой же цене, если такая есть
-            RevisionInfo revisionInArray = _marketDepthsRevisions.Find(info => info.Security == revision.Security && info.ReplId == revision.ReplId);
+            RevisionInfo revisionInArray = _lastRevisions.Find(info => info.Security == revision.Security && info.ReplId == revision.ReplId);
 
             if (revisionInArray != null)
             {
-                _marketDepthsRevisions.Remove(revisionInArray);
+                _lastRevisions.Remove(revisionInArray);
             }
 
             // add new | добавляем новую
-            _marketDepthsRevisions.Add(revision);
+            _lastRevisions.Add(revision);
 
             // create line for depth | создаём строку для стакана
             MarketDepthLevel depthLevel = new MarketDepthLevel();
@@ -1998,7 +1965,7 @@ namespace OsEngine.Market.Servers.Plaza
                 depthLevel.Ask = replmsg["volume"].asInt();
             }
 
-            depthLevel.Price = Convert.ToDouble(replmsg["price"].asDecimal());
+            depthLevel.Price = replmsg["price"].asDouble();
             depthLevel.Id = replmsg["replID"].asLong();
 
             // take our depth | берём наш стакан
@@ -2007,7 +1974,15 @@ namespace OsEngine.Market.Servers.Plaza
                 _marketDepths = new List<MarketDepth>();
             }
 
-            MarketDepth myDepth = _marketDepths.Find(depth => depth.SecurityNameCode == security.Name);
+            MarketDepth myDepth = null;
+            for (int i = 0; i < _marketDepths.Count; i++)
+            {
+                if (_marketDepths[i].SecurityNameCode == security.Name)
+                {
+                    myDepth = _marketDepths[i];
+                    break;
+                }
+            }
 
             if (myDepth == null)
             {
@@ -2016,7 +1991,7 @@ namespace OsEngine.Market.Servers.Plaza
                 _marketDepths.Add(myDepth);
             }
 
-            myDepth.Time = replmsg["moment"].asDateTime();
+            myDepth.Time = DateTime.Now; //replmsg["moment"].asDateTime();
 
             // add line in our depth | добавляем строку в наш стакан
 
@@ -2073,9 +2048,7 @@ namespace OsEngine.Market.Servers.Plaza
 
                         for (int i = 0, i2 = 0; i2 < bids.Count + 1; i2++)
                         {
-                            if (i == bids.Count && isIn == false ||
-                                (isIn == false &&
-                                 depthLevel.Price > bids[i].Price))
+                            if (i == bids.Count && isIn == false || (isIn == false && depthLevel.Price > bids[i].Price))
                             {
                                 isIn = true;
                                 asksNew.Add(depthLevel);
@@ -2095,8 +2068,7 @@ namespace OsEngine.Market.Servers.Plaza
                         bids = asksNew;
                     }
 
-                    if (asks != null && asks.Count != 0 &&
-                        asks[0].Price <= bids[0].Price)
+                    if (asks != null && asks.Count != 0 && asks[0].Price <= bids[0].Price)
                     {
                         while (asks.Count != 0 &&
                                asks[0].Price <= bids[0].Price)
@@ -2192,7 +2164,7 @@ namespace OsEngine.Market.Servers.Plaza
         {
             // process revision | обрабатываем ревизию
 
-            if (_marketDepthsRevisions == null)
+            if (_lastRevisions == null)
             {
                 return null;
             }
@@ -2203,11 +2175,11 @@ namespace OsEngine.Market.Servers.Plaza
 
             // remove at the same price, if any | удаляем по этой же цене, если такая есть
             RevisionInfo revisionInArray =
-                _marketDepthsRevisions.Find(info => info.Security == revision.Security && info.ReplId == revision.ReplId);
+                _lastRevisions.Find(info => info.Security == revision.Security && info.ReplId == revision.ReplId);
 
             if (revisionInArray != null)
             {
-                _marketDepthsRevisions.Remove(revisionInArray);
+                _lastRevisions.Remove(revisionInArray);
             }
 
             MarketDepth myDepth = _marketDepths.Find(depth => depth.SecurityNameCode == security.Name);
@@ -2220,7 +2192,7 @@ namespace OsEngine.Market.Servers.Plaza
                 _marketDepths.Add(myDepth);
                 return myDepth;
             }
-            myDepth.Time = replmsg["moment"].asDateTime();
+            myDepth.Time = DateTime.Now; // replmsg["moment"].asDateTime();
 
             if (revisionInArray == null)
             {
@@ -2299,11 +2271,11 @@ namespace OsEngine.Market.Servers.Plaza
             // msg.TableIdx;
             // msg.TableRev;
 
-            for (int i = 0; _marketDepthsRevisions != null && i < _marketDepthsRevisions.Count; i++)
+            for (int i = 0; _lastRevisions != null && i < _lastRevisions.Count; i++)
             {
-                if (_marketDepthsRevisions[i].TableRevision < msg.TableRev)
+                if (_lastRevisions[i].TableRevision < msg.TableRev)
                 {
-                    ClearThisRevision(_marketDepthsRevisions[i]);
+                    ClearThisRevision(_lastRevisions[i]);
                 }
             }
         }
@@ -2312,7 +2284,7 @@ namespace OsEngine.Market.Servers.Plaza
         {
             try
             {
-                _marketDepthsRevisions.Remove(info);
+                _lastRevisions.Remove(info);
 
                 MarketDepth myDepth = _marketDepths.Find(depth => depth.SecurityNameCode == info.Security);
 
@@ -2395,7 +2367,7 @@ namespace OsEngine.Market.Servers.Plaza
                                     trade.NumberTrade = replmsg["id_deal"].asLong().ToString();
                                     trade.SecurityNameCode = replmsg["isin_id"].asInt().ToString();
 
-                                    if (_securities != null)
+                                    if (_securities != null && _securities.Count != 0)
                                     {
                                         Security security = _securities.Find(security1 => security1.NameId == trade.SecurityNameCode);
 
@@ -2405,11 +2377,9 @@ namespace OsEngine.Market.Servers.Plaza
                                     trade.Time = replmsg["moment"].asDateTime();
                                     trade.Volume = replmsg["xamount"].asInt();
 
-
                                     string portfolioBuy = replmsg["code_buy"].asString();
 
                                     string portfolioSell = replmsg["code_sell"].asString();
-
 
                                     if (!string.IsNullOrWhiteSpace(portfolioBuy))
                                     {
@@ -2428,6 +2398,9 @@ namespace OsEngine.Market.Servers.Plaza
                                         }
                                     }
 
+                                    SendLogMessage($"Пришел трейд. NumberTrade: {trade.NumberTrade}, Sec: {trade.SecurityNameCode}, Price: {trade.Price}, Time: {trade.Time}, Volume: {trade.Volume}, " +
+                                        $"Order: {trade.NumberOrderParent}", LogMessageType.System);
+
                                     if (MyTradeEvent != null)
                                     {
                                         MyTradeEvent(trade);
@@ -2444,6 +2417,27 @@ namespace OsEngine.Market.Servers.Plaza
                                 {
                                     Order order = new Order();
 
+                                    order.NumberUser = replmsg["ext_id"].asInt();
+
+                                    lock (_currentOrdersLosker)
+                                    {
+                                        bool inArray = false;
+                                        for (int i = 0; i < _currentOrders.Count; i++)
+                                        {
+                                            if (_currentOrders[i].NumberUser == order.NumberUser)
+                                            {
+                                                order = _currentOrders[i];
+                                                inArray = true;
+                                                break;
+                                            }
+                                        }
+
+                                        if (inArray == false)
+                                        {
+                                            _currentOrders.Add(order);
+                                        }
+                                    }
+
                                     long xstatus = replmsg["xstatus"].asLong();
 
                                     if (((long)BitMask.Auction & xstatus) != 0) // признак лимитной заявки( Котировочная заявка (Day))
@@ -2456,16 +2450,19 @@ namespace OsEngine.Market.Servers.Plaza
                                     }
 
                                     order.NumberMarket = replmsg["public_order_id"].asLong().ToString();
-                                    order.NumberUser = replmsg["ext_id"].asInt();
 
-                                    order.Volume = replmsg["public_amount"].asInt();
-                                    order.VolumeExecute = replmsg["public_amount_rest"].asInt(); // это у нас оставшееся в заявке
+                                    if (order.Volume == 0)
+                                        order.Volume = (decimal)replmsg["public_amount"].asLong();
+
+                                    long remainingVolume = replmsg["public_amount_rest"].asLong(); // это у нас оставшееся в заявке
+                                    long currentVolume = replmsg["public_amount"].asLong();
+
 
                                     order.Price = Convert.ToDecimal(replmsg["price"].asDecimal());
                                     order.PortfolioNumber = replmsg["client_code"].asString();
                                     string securityNameCode = replmsg["isin_id"].asInt().ToString();
 
-                                    if (_securities != null)
+                                    if (_securities != null && _securities.Count != 0)
                                     {
                                         Security security = _securities.Find(sec => sec.NameId == securityNameCode);
 
@@ -2475,7 +2472,7 @@ namespace OsEngine.Market.Servers.Plaza
                                     order.TimeCallBack = replmsg["moment"].asDateTime();
                                     order.ServerType = ServerType.Plaza;
 
-                                    int action = replmsg["public_action"].asInt();
+                                    int action = replmsg["public_action"].asByte();
 
                                     if (action == 0)
                                     {
@@ -2503,14 +2500,36 @@ namespace OsEngine.Market.Servers.Plaza
                                     }
                                     else if (action == 1)
                                     {
+                                        order.VolumeExecute = order.Volume - remainingVolume;
                                         order.State = OrderStateType.Active;
                                     }
                                     else if (action == 2)
                                     {
-                                        order.State = OrderStateType.Done;
+                                        order.VolumeExecute = order.Volume - remainingVolume;
+
+                                        if (order.Volume != order.VolumeExecute)
+                                        {
+                                            order.State = OrderStateType.Partial;
+                                        }
+                                        else
+                                        {
+                                            order.State = OrderStateType.Done;
+
+                                            lock (_currentOrdersLosker)
+                                            {
+                                                for (int i = _currentOrders.Count - 1; i >= 0; i--)
+                                                {
+                                                    if (_currentOrders[i].NumberUser == order.NumberUser)
+                                                    {
+                                                        _currentOrders.RemoveAt(i);
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
 
-                                    int dir = replmsg["dir"].asInt();
+                                    byte dir = replmsg["dir"].asByte();
 
                                     if (dir == 1)
                                     {
@@ -2520,6 +2539,9 @@ namespace OsEngine.Market.Servers.Plaza
                                     {
                                         order.Side = Side.Sell;
                                     }
+
+                                    SendLogMessage($"Пришел ордер, orders_log. Number: {order.NumberMarket}, User: {order.NumberUser}, Volume: {order.Volume}, Execute: {order.VolumeExecute}, Price: {order.Price}, " +
+                                        $"State: {order.State}, Time: {order.TimeCallBack}", LogMessageType.Error);
 
                                     if (MyOrderEvent != null)
                                     {
@@ -2574,27 +2596,27 @@ namespace OsEngine.Market.Servers.Plaza
 
                                     int code = msgData["code"].asInt();
 
-                                    Order order = new Order();
+                                    Order order = _ordersToExecute.Dequeue();
 
                                     if (code == 0)
                                     {
-                                        CGate.LogInfo($"AddOrder. \n {msgData}");
-
-                                        order = _ordersToExecute.Dequeue();
+                                        lock (_currentOrdersLosker)
+                                        {
+                                            _currentOrders.Add(order);
+                                        }
 
                                         order.State = OrderStateType.Active;
                                         order.NumberMarket = msgData["order_id"].asLong().ToString();
                                     }
                                     else
                                     {
-                                        CGate.LogInfo($"AddOrder fail. \n {msgData.ToString()}");
-
-                                        order = _ordersToExecute.Dequeue();
-
                                         order.State = OrderStateType.Fail;
 
                                         SendLogMessage($"Order fail. Message - {msgData["message"].asString()}", LogMessageType.System);
                                     }
+
+                                    SendLogMessage($"Пришел ордер, Msg179. Number: {order.NumberMarket}, User: {order.NumberUser}, Volume: {order.Volume}, Execute: {order.VolumeExecute}, Price: {order.Price}, " +
+                                        $"State: {order.State}, Time: {order.TimeCallBack}", LogMessageType.Error);
 
                                     if (MyOrderEvent != null)
                                     {
@@ -2611,32 +2633,65 @@ namespace OsEngine.Market.Servers.Plaza
 
                                     if (code == 0)
                                     {
-                                        CGate.LogInfo($"DelOrder. \n {msgData.ToString()}");
-
                                         order = _ordersToCansel.Dequeue();
-                                        order.NumberUser = (int)msgData.UserId;
+
+                                        lock (_currentOrdersLosker)
+                                        {
+                                            for (int i = 0; i < _currentOrders.Count; i++)
+                                            {
+                                                if (_currentOrders[i].NumberUser == order.NumberUser)
+                                                {
+                                                    order = _currentOrders[i];
+                                                    break;
+                                                }
+                                            }
+                                        }
+
                                         order.State = OrderStateType.Cancel;
                                     }
                                     else if (code == 14)
                                     {
-                                        CGate.LogInfo($"DelOrder. The warrant has already been cancelled. \n {msgData.ToString()}");
-
                                         order = _ordersToCansel.Dequeue();
-                                        order.NumberUser = (int)msgData.UserId;
+
+                                        lock (_currentOrdersLosker)
+                                        {
+                                            for (int i = 0; i < _currentOrders.Count; i++)
+                                            {
+                                                if (_currentOrders[i].NumberUser == order.NumberUser)
+                                                {
+                                                    order = _currentOrders[i];
+                                                    break;
+                                                }
+                                            }
+                                        }
+
                                         order.State = OrderStateType.Cancel;
 
                                         SendLogMessage($"The warrant has already been cancelled. Message - {msgData["message"].asString()}", LogMessageType.System);
                                     }
                                     else
                                     {
-                                        CGate.LogInfo($"DelOrder fail. \n {msgData.ToString()}");
-
                                         order = _ordersToCansel.Dequeue();
-                                        order.NumberUser = (int)msgData.UserId;
+
+                                        lock (_currentOrdersLosker)
+                                        {
+                                            for (int i = 0; i < _currentOrders.Count; i++)
+                                            {
+                                                if (_currentOrders[i].NumberUser == order.NumberUser)
+                                                {
+                                                    order = _currentOrders[i];
+                                                    break;
+                                                }
+                                            }
+                                        }
+
                                         order.State = OrderStateType.Fail;
 
                                         SendLogMessage($"Order fail. Message - {msgData["message"].asString()}", LogMessageType.System);
                                     }
+
+                                    SendLogMessage($"Пришел ордер, Msg177. Number: {order.NumberMarket}, User: {order.NumberUser}, Volume: {order.Volume}, Execute: {order.VolumeExecute}, Price: {order.Price}, " +
+                                        $"State: {order.State}, Time: {order.TimeCallBack}", LogMessageType.Error);
 
                                     if (MyOrderEvent != null)
                                     {
@@ -2653,9 +2708,20 @@ namespace OsEngine.Market.Servers.Plaza
 
                                     if (code != 0)
                                     {
-                                        CGate.LogInfo($"MoveOrder fail. \n {msgData.ToString()}");
-
                                         order = _ordersToChange.Dequeue();
+
+                                        lock (_currentOrdersLosker)
+                                        {
+                                            for (int i = 0; i < _currentOrders.Count; i++)
+                                            {
+                                                if (_currentOrders[i].NumberUser == order.NumberUser)
+                                                {
+                                                    order = _currentOrders[i];
+                                                    break;
+                                                }
+                                            }
+                                        }
+
                                         order.State = OrderStateType.Fail;
 
                                         SendLogMessage($"Order fail. Message - {msgData["message"].asString()}", LogMessageType.System);
@@ -2664,15 +2730,28 @@ namespace OsEngine.Market.Servers.Plaza
                                     }
                                     else
                                     {
-                                        CGate.LogInfo($"MoveOrder. \n {msgData.ToString()}");
-
                                         order = _ordersToChange.Dequeue();
+
+                                        lock (_currentOrdersLosker)
+                                        {
+                                            for (int i = 0; i < _currentOrders.Count; i++)
+                                            {
+                                                if (_currentOrders[i].NumberUser == order.NumberUser)
+                                                {
+                                                    order = _currentOrders[i];
+                                                    break;
+                                                }
+                                            }
+                                        }
 
                                         order.NumberMarket = msgData["order_id1"].asLong().ToString();
                                         order.State = OrderStateType.Active;
 
                                         SendLogMessage($"Move order. NumberUser - {order.NumberUser}. Message - {msgData["message"].asString()}", LogMessageType.System);
                                     }
+
+                                    SendLogMessage($"Пришел ордер, Msg176. Number: {order.NumberMarket}, User: {order.NumberUser}, Volume: {order.Volume}, Execute: {order.VolumeExecute}, Price: {order.Price}, " +
+                                        $"State: {order.State}, Time: {order.TimeCallBack}", LogMessageType.Error);
 
                                     if (MyOrderEvent != null)
                                     {
@@ -2681,8 +2760,6 @@ namespace OsEngine.Market.Servers.Plaza
                                 }
                                 if (msgData.MsgId == 99)
                                 {
-                                    CGate.LogInfo(msgData.ToString());
-
                                     SendLogMessage($"{OsLocalization.Market.Message81}. " +
                                         $"The restriction will be lifted after {msgData["penalty_remain"].asInt()} milliseconds", LogMessageType.System);
 
@@ -2694,7 +2771,6 @@ namespace OsEngine.Market.Servers.Plaza
                                 }
                                 else if (msgData.MsgId == 100)
                                 {
-                                    CGate.LogInfo(msgData.ToString());
                                     SendLogMessage(msgData.ToString(), LogMessageType.Error);
                                 }
                             }
@@ -2738,11 +2814,33 @@ namespace OsEngine.Market.Servers.Plaza
                                 {
                                     Order order = new Order();
 
-                                    order.NumberMarket = replmsg["public_order_id"].asLong().ToString();
                                     order.NumberUser = replmsg["ext_id"].asInt();
 
-                                    order.Volume = replmsg["public_amount"].asInt();
-                                    order.VolumeExecute = replmsg["public_amount_rest"].asInt();
+                                    lock (_currentOrdersLosker)
+                                    {
+                                        bool inArray = false;
+                                        for (int i = 0; i < _currentOrders.Count; i++)
+                                        {
+                                            if (_currentOrders[i].NumberUser == order.NumberUser)
+                                            {
+                                                order = _currentOrders[i];
+                                                inArray = true;
+                                                break;
+                                            }
+                                        }
+
+                                        if (inArray == false)
+                                        {
+                                            _currentOrders.Add(order);
+                                        }
+                                    }
+
+                                    order.NumberMarket = replmsg["public_order_id"].asLong().ToString();
+
+                                    if (order.Volume == 0)
+                                        order.Volume = (decimal)replmsg["public_amount"].asLong();
+
+                                    long remainingVolume = replmsg["public_amount_rest"].asLong(); // это у нас оставшееся в заявке
 
                                     order.Price = Convert.ToDecimal(replmsg["price"].asDecimal());
                                     order.PortfolioNumber = replmsg["client_code"].asString();
@@ -2756,26 +2854,60 @@ namespace OsEngine.Market.Servers.Plaza
                                             order.SecurityNameCode = security.Name;
                                     }
 
+                                    long xstatus = replmsg["xstatus"].asLong();
+
+                                    if (((long)BitMask.Auction & xstatus) != 0) // признак лимитной заявки( Котировочная заявка (Day))
+                                    {
+                                        order.TypeOrder = OrderPriceType.Limit;
+                                    }
+                                    else if (((long)BitMask.Opposite & xstatus) != 0) // признак маркет заявки ( Встречная заявка (IOC))
+                                    {
+                                        order.TypeOrder = OrderPriceType.Market;
+                                    }
+
                                     order.TimeCallBack = replmsg["moment"].asDateTime();
                                     order.ServerType = ServerType.Plaza;
 
-                                    int action = replmsg["public_action"].asInt();
+                                    byte action = replmsg["public_action"].asByte();
 
                                     if (action == 0)
                                     {
+                                        order.VolumeExecute = order.VolumeExecute;
                                         order.State = OrderStateType.Cancel;
                                         order.TimeCancel = order.TimeCallBack;
                                     }
                                     else if (action == 1)
                                     {
+                                        order.VolumeExecute = order.Volume - remainingVolume;
                                         order.State = OrderStateType.Active;
                                     }
                                     else if (action == 2)
                                     {
-                                        order.State = OrderStateType.Done;
+                                        order.VolumeExecute = order.Volume - remainingVolume;
+
+                                        if (order.Volume != order.VolumeExecute)
+                                        {
+                                            order.State = OrderStateType.Partial;
+                                        }
+                                        else
+                                        {
+                                            order.State = OrderStateType.Done;
+
+                                            lock (_currentOrdersLosker)
+                                            {
+                                                for (int i = _currentOrders.Count; i >= 0; i--)
+                                                {
+                                                    if (_currentOrders[i].NumberUser == order.NumberUser)
+                                                    {
+                                                        _currentOrders.RemoveAt(i);
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
 
-                                    int dir = replmsg["dir"].asInt();
+                                    byte dir = replmsg["dir"].asByte();
 
                                     if (dir == 1)
                                     {
@@ -2785,6 +2917,9 @@ namespace OsEngine.Market.Servers.Plaza
                                     {
                                         order.Side = Side.Sell;
                                     }
+
+                                    SendLogMessage($"Пришел ордер, orders. Number: {order.NumberMarket}, User: {order.NumberUser}, Volume: {order.Volume}, Execute: {order.VolumeExecute}, Price: {order.Price}, " +
+                                        $"State: {order.State}, Time: {order.TimeCallBack}", LogMessageType.Error);
 
                                     if (MyOrderEvent != null)
                                     {
@@ -2861,6 +2996,8 @@ namespace OsEngine.Market.Servers.Plaza
                     smsg.UserId = (uint)order.NumberUser;
                     smsg["broker_code"].set(brockerCode);
                     smsg["order_id"].set(Convert.ToInt64(order.NumberMarket));
+
+                    SendLogMessage($"Отменен ордер. Price {order.Price.ToString().Replace(',', '.')}, User: {order.NumberUser}, Number: {order.NumberMarket}, Volume: {Convert.ToInt32(order.Volume)} ", LogMessageType.System);
 
                     _ordersToCansel.Enqueue(order);
 
@@ -3044,11 +3181,12 @@ namespace OsEngine.Market.Servers.Plaza
                     smsg["amount"].set(Convert.ToInt32(order.Volume));
                     smsg["ext_id"].set(order.NumberUser);
 
+                    SendLogMessage($"Выслан ордер. Price {order.Price.ToString().Replace(',', '.')}, User: {order.NumberUser}, Volume: {Convert.ToInt32(order.Volume)} ", LogMessageType.System);
+
                     _ordersToExecute.Enqueue(order);
 
                     _publisher.Post(sendMessage, PublishFlag.NeedReply);
                     sendMessage.Dispose();
-
                 }
                 catch (Exception error)
                 {
@@ -3057,7 +3195,7 @@ namespace OsEngine.Market.Servers.Plaza
             }
         }
 
-        public OrderStateType GetOrderStatus(Order order) 
+        public OrderStateType GetOrderStatus(Order order)
         {
             return OrderStateType.None;
         }

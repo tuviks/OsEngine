@@ -132,6 +132,11 @@ namespace OsEngine.Entity
         private decimal _volumeExecute;
         private bool _volumeExecuteChange;
 
+        public void ReCalculateVolume()
+        {
+            _volumeExecuteChange = true;
+        }
+
         /// <summary>
         /// My trades belonging to this order
         /// </summary>
@@ -680,23 +685,23 @@ namespace OsEngine.Entity
     public enum OrderTypeTime
     {
         /// <summary>
-        /// Order will be valid for as long as specified in the LifeTime variable
-        /// </summary>
-        Specified,
-
-        /// <summary>
         ///  Order will be in the queue until it is withdrawn
         /// </summary>
         GTC,
 
         /// <summary>
-        /// Order will be throughout the day. If the exchange has such possibilities
+        /// Order will be valid for as long as specified in the LifeTime variable
+        /// </summary>
+        Specified,
+
+        /// <summary>
+        /// Order will be throughout the day. 
         /// </summary>
         Day,
 
         /// <summary>
-        /// Passive order. Order that is added to the order book only if it cannot be executed immediately
+        /// Order will be throughout the trade session.
         /// </summary>
-        BookOrCancel
+        TradeSession
     }
 }

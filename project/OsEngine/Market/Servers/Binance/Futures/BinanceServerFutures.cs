@@ -214,6 +214,8 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
         public event Action DisconnectEvent;
 
+        public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
+
         #endregion
 
         #region 2 Properties
@@ -291,7 +293,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 //GET /sapi/v1/margin/allPairs
 
                 string res = CreateQuery(Method.GET, "/" + type_str_selector + "/v1/exchangeInfo", null, false);
-                SecurityResponce secResp = JsonConvert.DeserializeAnonymousType(res, new SecurityResponce());
+                SecurityResponse secResp = JsonConvert.DeserializeAnonymousType(res, new SecurityResponse());
                 UpdatePairs(secResp);
             }
             catch (Exception ex)
@@ -305,7 +307,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
         private List<Security> _securities = new List<Security>();
 
-        private void UpdatePairs(SecurityResponce pairs)
+        private void UpdatePairs(SecurityResponse pairs)
         {
             foreach (var sec in pairs.symbols)
             {
@@ -472,11 +474,11 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
         public void GetPortfolios()
         {
-            AccountResponseFutures responce = GetAccountInfo();
+            AccountResponseFutures response = GetAccountInfo();
 
-            if (responce != null)
+            if (response != null)
             {
-                UpdatePortfolio(responce, true);
+                UpdatePortfolio(response, true);
             }
         }
 
@@ -1321,6 +1323,11 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
         private List<Trade> CreateTradesFromJson(string secName, AgregatedHistoryTrade[] binTrades)
         {
+            if (binTrades == null)
+            {
+                return null;
+            }
+
             List<Trade> trades = new List<Trade>();
 
             foreach (var jtTrade in binTrades)
@@ -1383,7 +1390,14 @@ namespace OsEngine.Market.Servers.Binance.Futures
         {
             string createListenKeyUrl = String.Format("/{0}/v1/listenKey", type_str_selector);
             var createListenKeyResult = CreateQueryNoLock(Method.POST, createListenKeyUrl, null, false);
-            return JsonConvert.DeserializeAnonymousType(createListenKeyResult, new ListenKey()).listenKey;
+            ListenKey responseKey = JsonConvert.DeserializeAnonymousType(createListenKeyResult, new ListenKey());
+
+            if (responseKey == null)
+            {
+                return null;
+            }
+
+            return responseKey.listenKey;
         }
 
         private void ActivateSockets()
@@ -1620,62 +1634,73 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
         private List<Security> _subscribedSecurities = new List<Security>();
 
+        private RateGate _rateGateSubscribe = new RateGate(1, TimeSpan.FromMilliseconds(150));
+
         public void Subscribe(Security security)
         {
-            if (ServerStatus == ServerConnectStatus.Disconnect)
-            {
-                return;
-            }
+            _rateGateSubscribe.WaitToProceed();
 
-            for (int i = 0; i < _subscribedSecurities.Count; i++)
+            try
             {
-                if (_subscribedSecurities[i].NameClass == security.NameClass
-                    && _subscribedSecurities[i].Name == security.Name)
+                if (ServerStatus == ServerConnectStatus.Disconnect)
                 {
                     return;
                 }
+
+                for (int i = 0; i < _subscribedSecurities.Count; i++)
+                {
+                    if (_subscribedSecurities[i].NameClass == security.NameClass
+                        && _subscribedSecurities[i].Name == security.Name)
+                    {
+                        return;
+                    }
+                }
+
+                _subscribedSecurities.Add(security);
+
+                string urlStrDepth = null;
+
+                if (((ServerParameterBool)ServerParameters[13]).Value == false)
+                {
+                    urlStrDepth = wss_point + "/stream?streams="
+                                 + security.Name.ToLower() + "@depth5"
+                                 + "/" + security.Name.ToLower() + "@trade";
+
+                }
+                else
+                {
+                    urlStrDepth = wss_point + "/stream?streams="
+                     + security.Name.ToLower() + "@depth20"
+                     + "/" + security.Name.ToLower() + "@trade";
+                }
+
+                if (_extendedMarketData)
+                {
+                    urlStrDepth += "/" + security.Name.ToLower() + "@markPrice" + "/" + security.Name.ToLower() + "@miniTicker";
+
+                    GetFundingRate(security.Name);
+                    GetFundingHistory(security.Name.ToLower());
+                }
+
+                WebSocket wsClientDepth = new WebSocket(urlStrDepth);
+
+                if (_myProxy != null)
+                {
+                    wsClientDepth.SetProxy(_myProxy);
+                }
+
+                wsClientDepth.EmitOnPing = true;
+                wsClientDepth.OnMessage += _socket_PublicMessage;
+                wsClientDepth.OnError += _socketClient_Error;
+                wsClientDepth.OnClose += _socketClient_Closed;
+                wsClientDepth.ConnectAsync();
+
+                _socketsArray.Add(security.Name + "_depth20", wsClientDepth);
             }
-
-            _subscribedSecurities.Add(security);
-
-            string urlStrDepth = null;
-
-            if (((ServerParameterBool)ServerParameters[13]).Value == false)
+            catch (Exception ex)
             {
-                urlStrDepth = wss_point + "/stream?streams="
-                             + security.Name.ToLower() + "@depth5"
-                             + "/" + security.Name.ToLower() + "@trade";
-
+                SendLogMessage(ex.Message, LogMessageType.Error);
             }
-            else
-            {
-                urlStrDepth = wss_point + "/stream?streams="
-                 + security.Name.ToLower() + "@depth20"
-                 + "/" + security.Name.ToLower() + "@trade";
-            }
-
-            if (_extendedMarketData)
-            {
-                urlStrDepth += "/" + security.Name.ToLower() + "@markPrice" + "/" + security.Name.ToLower() + "@miniTicker";
-
-                GetFundingRate(security.Name);
-                GetFundingHistory(security.Name.ToLower());
-            }
-
-            WebSocket wsClientDepth = new WebSocket(urlStrDepth);
-
-            if (_myProxy != null)
-            {
-                wsClientDepth.SetProxy(_myProxy);
-            }
-
-            wsClientDepth.EmitOnPing = true;
-            wsClientDepth.OnMessage += _socket_PublicMessage;
-            wsClientDepth.OnError += _socketClient_Error;
-            wsClientDepth.OnClose += _socketClient_Closed;
-            wsClientDepth.ConnectAsync();
-
-            _socketsArray.Add(security.Name + "_depth20", wsClientDepth);
         }
 
         private void GetFundingRate(string security)
@@ -2247,7 +2272,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     MyTradeEvent(trade);
                 }
 
-                if (order.X == "FILLED" 
+                if (order.X == "FILLED"
                     || order.X == "PARTIALLY_FILLED")
                 {
                     Order newOrder = new Order();
@@ -2816,25 +2841,25 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     return null;
                 }
 
-                List<TradesResponseReserches> responceTrades =
+                List<TradesResponseReserches> responseTrades =
                     JsonConvert.DeserializeAnonymousType(res, new List<TradesResponseReserches>());
 
                 List<MyTrade> trades = new List<MyTrade>();
 
-                for (int j = 0; j < responceTrades.Count; j++)
+                for (int j = 0; j < responseTrades.Count; j++)
                 {
-                    if (order.NumberMarket == Convert.ToString(responceTrades[j].orderid))
+                    if (order.NumberMarket == Convert.ToString(responseTrades[j].orderid))
                     {
-                        TradesResponseReserches responcetrade = responceTrades[j];
+                        TradesResponseReserches item = responseTrades[j];
 
                         MyTrade trade = new MyTrade();
-                        trade.Time = new DateTime(1970, 1, 1).AddMilliseconds(Convert.ToDouble(responcetrade.time));
-                        trade.NumberOrderParent = responcetrade.orderid.ToString();
-                        trade.NumberTrade = responcetrade.id.ToString();
-                        trade.Volume = responcetrade.qty.ToDecimal();
-                        trade.Price = responcetrade.price.ToDecimal();
-                        trade.SecurityNameCode = responcetrade.symbol;
-                        trade.Side = responcetrade.side == "BUY" ? Side.Buy : Side.Sell;
+                        trade.Time = new DateTime(1970, 1, 1).AddMilliseconds(Convert.ToDouble(item.time));
+                        trade.NumberOrderParent = item.orderid.ToString();
+                        trade.NumberTrade = item.id.ToString();
+                        trade.Volume = item.qty.ToDecimal();
+                        trade.Price = item.price.ToDecimal();
+                        trade.SecurityNameCode = item.symbol;
+                        trade.Side = item.side == "BUY" ? Side.Buy : Side.Sell;
 
                         trades.Add(trade);
                     }
@@ -2862,6 +2887,11 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 }
 
                 List<OrderOpenRestRespFut> respOrders = JsonConvert.DeserializeAnonymousType(res, new List<OrderOpenRestRespFut>());
+
+                if (respOrders == null)
+                {
+                    return;
+                }
 
                 List<Order> orderOnBoard = new List<Order>();
 

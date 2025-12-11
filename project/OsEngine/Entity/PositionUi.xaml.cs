@@ -354,7 +354,7 @@ namespace OsEngine.Entity
             MouseEventArgs mouse = (MouseEventArgs)e;
             if (mouse.Button != MouseButtons.Right)
             {
-                CheckOpenOrdersTimeButtonClick(_position.CloseOrders, _closeOrdersGrid);
+                CheckOrdersTimeButtonClick(_position.CloseOrders, _closeOrdersGrid);
                 return;
             }
 
@@ -399,6 +399,11 @@ namespace OsEngine.Entity
                 newOrder.TypeOrder = OrderPriceType.Limit;
                 newOrder.PortfolioNumber = GetPortfolioName();
                 newOrder.PositionConditionType = OrderPositionConditionType.Close;
+
+                if (string.IsNullOrEmpty(_position.SecurityName) == false)
+                {
+                    newOrder.SecurityNameCode = _position.SecurityName;
+                }
 
                 _position.AddNewCloseOrder(newOrder);
 
@@ -460,7 +465,7 @@ namespace OsEngine.Entity
                 MouseEventArgs mouse = (MouseEventArgs)e;
                 if (mouse.Button != MouseButtons.Right)
                 {
-                    CheckOpenOrdersTimeButtonClick(_position.OpenOrders, _openOrdersGrid);
+                    CheckOrdersTimeButtonClick(_position.OpenOrders, _openOrdersGrid);
                     return;
                 }
 
@@ -483,7 +488,7 @@ namespace OsEngine.Entity
             }
         }
 
-        private void CheckOpenOrdersTimeButtonClick(List<Order> orders, DataGridView grid)
+        private void CheckOrdersTimeButtonClick(List<Order> orders, DataGridView grid)
         {
             try
             {
@@ -526,7 +531,7 @@ namespace OsEngine.Entity
                     {
                         myOrder.TimeCallBack = dialog.Time;
                         myOrder.TimeCreate = dialog.Time;
-                        RePaint();
+                        grid.Rows[tabRow].Cells[tabColumn].Value = myOrder.TimeCallBack.ToString(_currentCulture);
                     }
                 }
             }
@@ -547,6 +552,11 @@ namespace OsEngine.Entity
                 newOrder.TypeOrder = OrderPriceType.Limit;
                 newOrder.PortfolioNumber = GetPortfolioName();
                 newOrder.PositionConditionType = OrderPositionConditionType.Open;
+
+                if(string.IsNullOrEmpty(_position.SecurityName) == false)
+                {
+                    newOrder.SecurityNameCode = _position.SecurityName;
+                }
 
                 _position.AddNewOpenOrder(newOrder);
 
@@ -714,7 +724,7 @@ namespace OsEngine.Entity
                     if (dialog.IsSaved)
                     {
                         myOrder.Time = dialog.Time;
-                        RePaint();
+                        grid.Rows[tabRow].Cells[tabColumn].Value = myOrder.Time.ToString(_currentCulture);
                     }
                 }
             }
@@ -843,6 +853,18 @@ namespace OsEngine.Entity
                 trade.NumberPosition = _position.Number.ToString();
                 trade.NumberTrade = NumberGen.GetNumberOrder(_startProgram).ToString();
 
+                if(myOrd.MyTrades != null 
+                    && myOrd.MyTrades.Count != 0)
+                {
+                    MyTrade firstTrade = myOrd.MyTrades[0];
+
+                    if(firstTrade != null)
+                    {
+                        trade.Time = firstTrade.Time;
+                        trade.Price = firstTrade.Price;
+                    }
+                }
+
                 myOrd.SetTrade(trade);
 
                 SyncPositionWithOrdersAndMyTrades();
@@ -951,6 +973,7 @@ namespace OsEngine.Entity
                             break;
                         }
                     }
+                    curOrd.ReCalculateVolume();
                 }
 
                 for (int i = 0; closeOrders != null && i < closeOrders.Count; i++)
@@ -973,6 +996,7 @@ namespace OsEngine.Entity
                             break;
                         }
                     }
+                    curOrd.ReCalculateVolume();
                 }
 
                 RePaint();
@@ -1047,6 +1071,7 @@ namespace OsEngine.Entity
             for (int i = 0; openOrders != null && i < openOrders.Count; i++)
             {
                 Order curOrd = openOrders[i];
+                curOrd.ReCalculateVolume();
                 curOrd.SecurityNameCode = securityName;
 
                 List<MyTrade> trades = openOrders[i].MyTrades;
@@ -1060,6 +1085,7 @@ namespace OsEngine.Entity
             for (int i = 0; closeOrders != null && i < closeOrders.Count; i++)
             {
                 Order curOrd = closeOrders[i];
+                curOrd.ReCalculateVolume();
                 curOrd.SecurityNameCode = securityName;
 
                 List<MyTrade> trades = closeOrders[i].MyTrades;
@@ -1092,9 +1118,10 @@ namespace OsEngine.Entity
 
                 SyncPositionWithOrdersAndMyTrades();
                 SavePosition();
+                SaveMyTrades();
                 SaveOrders(_position.OpenOrders, _openOrdersGrid.Rows);
                 SaveOrders(_position.CloseOrders, _closeOrdersGrid.Rows);
-                SaveMyTrades();
+              
 
                 PositionChanged = true;
 

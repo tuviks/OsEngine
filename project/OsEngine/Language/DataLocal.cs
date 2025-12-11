@@ -256,5 +256,140 @@ namespace OsEngine.Language
            "Eng:Data has been downloaded and saved to the hard drive_" +
            "Ru:Данные загружены и сохранены на жёсткий диск_");
 
+        public string TitleAddLqdt => OsLocalization.ConvertToLocString(
+           "Eng:Add LQDT_" +
+           "Ru:Добавить LQDT_");
+
+        public string Label60 => OsLocalization.ConvertToLocString(
+           "Eng:Exchange_" +
+           "Ru:Биржа_");
+
+        public string ButtonCreate => OsLocalization.ConvertToLocString(
+           "Eng:Create_" +
+           "Ru:Создать_");
+
+        public string Label61 => OsLocalization.ConvertToLocString(
+          "Eng:Settings_" +
+          "Ru:Настройки_");
+
+        public string Label62 => OsLocalization.ConvertToLocString(
+          "Eng:Deleting by start and end time_" +
+          "Ru:Удаление по времени начала и конца_");
+
+        public string Label63 => OsLocalization.ConvertToLocString(
+          "Eng:Data start time_" +
+          "Ru:Начало данных_");
+
+        public string Label64 => OsLocalization.ConvertToLocString(
+          "Eng:Data end time_" +
+          "Ru:Конец данных_");
+
+        public string Label65 => OsLocalization.ConvertToLocString(
+          "Eng:Deleting by start and end time_" +
+          "Ru:Удаление по количеству объектов_");
+
+        public string Label66 => OsLocalization.ConvertToLocString(
+          "Eng:Objects in security_" +
+          "Ru:Кол-во объектов у бумаги_");
+
+        public string Label67 => OsLocalization.ConvertToLocString(
+          "Eng:Deleting by volatility_" +
+          "Ru:Удаление по волатильности_");
+
+        public string Label68 => OsLocalization.ConvertToLocString(
+           "Eng:Max volatility_" +
+           "Ru:Макс. волатильность_");
+
+        public string Label69 => OsLocalization.ConvertToLocString(
+           "Eng:Min volatility_" +
+           "Ru:Мин. волатильность_");
+
+        public string Label70 => OsLocalization.ConvertToLocString(
+           "Eng:Deleting by significant digit count_" +
+           "Ru:Удаление по значимой части цены_");
+
+        public string Label71 => OsLocalization.ConvertToLocString(
+          "Eng:Max digits_" +
+          "Ru:Макс. цифр_");
+
+        public string Label72 => OsLocalization.ConvertToLocString(
+           "Eng:Min digits_" +
+           "Ru:Мин. цифр_");
+
+        public string Label73 => OsLocalization.ConvertToLocString(
+           "Eng:Prune_" +
+           "Ru:Обрезать_");
+
+        public string Label74 => OsLocalization.ConvertToLocString(
+           "Eng:You must enter an integer_" +
+           "Ru:Необходимо ввести целое число_");
+
+        public string Label75 => OsLocalization.ConvertToLocString(
+           "Eng:The date range must be specified correctly_" +
+           "Ru:Необходимо корректно указать диапазон дат_");
+
+        public string Label76 => OsLocalization.ConvertToLocString(
+            "Eng:You want to delete these securities.Are you sure?_" +
+            "Ru:Вы собираетесь удалить следующие инструменты.Вы уверены?_");
+ 
+        public string Label77 => OsLocalization.ConvertToLocString(
+          "Eng:You must enter fractional or integer number_" +
+          "Ru:Необходимо ввести целое или дробное число_");
+
+        public string Label78 => OsLocalization.ConvertToLocString(
+          "Eng:Deleting data based on a condition_" +
+          "Ru:Удаление данных по условию_");
+
+        public string Label79 => OsLocalization.ConvertToLocString(
+          "Eng:Copy_" +
+          "Ru:Дублировать_");
+
+        public string Label80 => OsLocalization.ConvertToLocString(
+          "Eng:Choose folder_" +
+          "Ru:Выбрать папку_");
+
+        public string Label81 => OsLocalization.ConvertToLocString(
+          "Eng:Current folder name for set dublication_" +
+          "Ru:Текущая папка для дублирования сета_");
+
+        public string Label82 => OsLocalization.ConvertToLocString(
+          "Eng:Dublicate Now_" +
+          "Ru:Дублировать сейчас_");
+
+        public string Label83 => OsLocalization.ConvertToLocString(
+          "Eng:Every_" +
+          "Ru:Каждые_");
+
+        public string Label84 => OsLocalization.ConvertToLocString(
+          "Eng:minutes_" +
+          "Ru:минут_");
+
+        public string Label85 => OsLocalization.ConvertToLocString(
+          "Eng:Select a folder for set duplication_" +
+          "Ru:Выберите папку для дублирования сета_");
+
+        public string Label86 => OsLocalization.ConvertToLocString(
+          "Eng:Set duplication_" +
+          "Ru:Дублирование сета_");
+
+        public string Label87 => OsLocalization.ConvertToLocString(
+          "Eng:Success_" +
+          "Ru:Успешно_");
+
+        public string Label88 => OsLocalization.ConvertToLocString(
+          "Eng:First turn On the connector!_" +
+          "Ru:Сначала включите коннектор!_");
+
+        public string Label89 => OsLocalization.ConvertToLocString(
+          "Eng:First, turn on the On mode in the set!_" +
+          "Ru:Сначала установите сет в режим On!_");
+
+        public string Label90 => OsLocalization.ConvertToLocString(
+          "Eng:Copying failed_" +
+          "Ru:Копирование не удалось_");
+
+        public string Label91 => OsLocalization.ConvertToLocString(
+          "Eng:There is no path to duplicate the set_" +
+          "Ru:Отсутствует путь для дублирования сета_");
     }
 }

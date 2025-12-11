@@ -68,7 +68,10 @@ namespace OsEngine.Market.Servers.MOEX
         }
 
         public event Action ConnectEvent;
+
         public event Action DisconnectEvent;
+
+        public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
 
         #endregion
 
@@ -657,6 +660,11 @@ namespace OsEngine.Market.Servers.MOEX
 
             string response = GetRequest(str);
 
+            if (string.IsNullOrEmpty(response))
+            {
+                return null;
+            }
+
             List<Candle> result = new List<Candle>();
 
             JObject json = JObject.Parse(response);
@@ -697,7 +705,8 @@ namespace OsEngine.Market.Servers.MOEX
             {
                 RestRequest requestRest = new RestRequest(Method.GET);
                 RestClient client = new RestClient(url);
-                var responseMessage = client.Execute(requestRest).Content;
+
+                string responseMessage = client.Execute(requestRest).Content;
                 return responseMessage;
             }
             catch (Exception error)

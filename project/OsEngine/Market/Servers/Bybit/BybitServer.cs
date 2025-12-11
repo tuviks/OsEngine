@@ -36,7 +36,8 @@ namespace OsEngine.Market.Servers.Bybit
             CreateParameterEnum("Server type", Net_type.MainNet.ToString(), new List<string>() { Net_type.MainNet.ToString(),
                 Net_type.Demo.ToString(), Net_type.Netherlands.ToString(), Net_type.HongKong.ToString(), Net_type.Turkey.ToString(), Net_type.Kazakhstan.ToString() });
             CreateParameterEnum("Margin Mode", MarginMode.Cross.ToString(), new List<string>() { MarginMode.Cross.ToString(), MarginMode.Isolated.ToString() });
-            CreateParameterEnum("Hedge Mode", "On", new List<string> { "On", "Off" });
+            CreateParameterBoolean("Hedge Mode", true);
+            ServerParameters[4].ValueChange += BybitServer_ValueChange;
             CreateParameterString("Leverage", "");
             CreateParameterBoolean("Extended Data", false);
             CreateParameterBoolean("Use Options", false);
@@ -50,6 +51,11 @@ namespace OsEngine.Market.Servers.Bybit
             ServerParameters[6].Comment = OsLocalization.Market.Label252;
             ServerParameters[7].Comment = OsLocalization.Market.Label253;
         }
+
+        private void BybitServer_ValueChange()
+        {
+            ((BybitServerRealization)ServerRealization).HedgeMode = ((ServerParameterBool)ServerParameters[4]).Value;
+        }
     }
 
     public class BybitServerRealization : IServerRealization
@@ -60,6 +66,8 @@ namespace OsEngine.Market.Servers.Bybit
         public event Action ConnectEvent;
 
         public event Action DisconnectEvent;
+
+        public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
 
         public BybitServerRealization()
         {
@@ -113,8 +121,6 @@ namespace OsEngine.Market.Servers.Bybit
             Thread threadMessageReaderOrderBookOption = new Thread(() => ThreadMessageReaderOrderBookOption());
             threadMessageReaderOrderBookOption.Name = "ThreadBybitMessageReaderOrderBookOption";
             threadMessageReaderOrderBookOption.Start();
-
-
         }
 
         private WebProxy _myProxy;
@@ -129,18 +135,10 @@ namespace OsEngine.Market.Servers.Bybit
                 SecretKey = ((ServerParameterPassword)ServerParameters[1]).Value;
                 net_type = (Net_type)Enum.Parse(typeof(Net_type), ((ServerParameterEnum)ServerParameters[2]).Value);
                 margineMode = (MarginMode)Enum.Parse(typeof(MarginMode), ((ServerParameterEnum)ServerParameters[3]).Value);
+                HedgeMode = ((ServerParameterBool)ServerParameters[4]).Value;
 
                 httpClientHandler = null;
                 httpClient = null;
-
-                if (((ServerParameterEnum)ServerParameters[4]).Value == "On")
-                {
-                    _hedgeMode = true;
-                }
-                else
-                {
-                    _hedgeMode = false;
-                }
 
                 _leverage = ((ServerParameterString)ServerParameters[5]).Value.Replace(",", ".");
 
@@ -174,7 +172,7 @@ namespace OsEngine.Market.Servers.Bybit
 
                 CheckFullActivation();
                 SetMargineMode();
-                SetPositionMode();
+                //SetPositionMode();
             }
             catch (Exception ex)
             {
@@ -265,6 +263,8 @@ namespace OsEngine.Market.Servers.Bybit
                 {
                     ServerStatus = ServerConnectStatus.Connect;
                     ConnectEvent();
+
+                    SetPositionMode();
                 }
             }
             catch (Exception ex)
@@ -359,11 +359,16 @@ namespace OsEngine.Market.Servers.Bybit
         {
             try
             {
+                if (ServerStatus == ServerConnectStatus.Disconnect)
+                {
+                    return;
+                }
+
                 Dictionary<string, object> parametrs = new Dictionary<string, object>();
                 parametrs.Clear();
                 parametrs["category"] = Category.linear.ToString();
                 parametrs["coin"] = "USDT";
-                parametrs["mode"] = _hedgeMode == true ? "3" : "0"; //Position mode. 0: Merged Single. 3: Both Sides
+                parametrs["mode"] = HedgeMode == true ? "3" : "0"; //Position mode. 0: Merged Single. 3: Both Sides
 
                 CreatePrivateQuery(parametrs, HttpMethod.Post, "/v5/position/switch-mode");
             }
@@ -396,6 +401,21 @@ namespace OsEngine.Market.Servers.Bybit
         private MarginMode margineMode;
 
         private bool _hedgeMode;
+
+        public bool HedgeMode
+        {
+            get { return _hedgeMode; }
+            set
+            {
+                if (value == _hedgeMode)
+                {
+                    return;
+                }
+                _hedgeMode = value;
+
+                SetPositionMode();
+            }
+        }
 
         private string _leverage;
 
@@ -564,7 +584,7 @@ namespace OsEngine.Market.Servers.Bybit
             Dictionary<string, object> parametrs = new Dictionary<string, object>();
             parametrs.Add("limit", "1000");
             parametrs["category"] = category.ToString();
-            
+
             string cursor = "";
 
             while (true)
@@ -584,7 +604,7 @@ namespace OsEngine.Market.Servers.Bybit
                     else
                     {
                         SendLogMessage($"{category} securities error. Code: {responseSymbols?.retCode}\nMessage: {responseSymbols?.retMsg}", LogMessageType.Error);
-                        break; 
+                        break;
                     }
 
                     if (string.IsNullOrEmpty(responseSymbols.result.nextPageCursor))
@@ -598,7 +618,7 @@ namespace OsEngine.Market.Servers.Bybit
                 }
                 else
                 {
-                    break; 
+                    break;
                 }
             }
         }
@@ -685,7 +705,7 @@ namespace OsEngine.Market.Servers.Bybit
                     {
                         Security security = new Security();
                         security.NameFull = oneSec.symbol;
-                        
+
                         if (category == Category.linear
                             || category == Category.inverse)
                         {
@@ -707,6 +727,7 @@ namespace OsEngine.Market.Servers.Bybit
                             security.NameId = oneSec.symbol;
                             security.NameClass = oneSec.quoteCoin;
                             security.MinTradeAmount = oneSec.lotSizeFilter.minOrderAmt.ToDecimal();
+                            security.MinTradeAmountType = MinTradeAmountType.C_Currency;
                         }
                         else if (category == Category.linear)
                         {
@@ -722,7 +743,8 @@ namespace OsEngine.Market.Servers.Bybit
                                 security.NameClass = oneSec.contractType;
                             }
 
-                            security.MinTradeAmount = oneSec.lotSizeFilter.minNotionalValue.ToDecimal();
+                            security.MinTradeAmount = oneSec.lotSizeFilter.minOrderQty.ToDecimal();
+                            security.MinTradeAmountType = MinTradeAmountType.Contract;
                         }
                         else if (category == Category.inverse)
                         {
@@ -730,6 +752,7 @@ namespace OsEngine.Market.Servers.Bybit
                             security.NameId = oneSec.symbol + ".I";
                             security.NameClass = oneSec.contractType;
                             security.MinTradeAmount = oneSec.lotSizeFilter.minOrderQty.ToDecimal();
+                            security.MinTradeAmountType = MinTradeAmountType.Contract;
                         }
                         else if (category == Category.option)
                         {
@@ -738,6 +761,7 @@ namespace OsEngine.Market.Servers.Bybit
                             security.NameId = oneSec.symbol;
                             security.NameClass = oneSec.quoteCoin + "_Options";
                             security.MinTradeAmount = oneSec.lotSizeFilter.minOrderQty.ToDecimal();
+                            security.MinTradeAmountType = MinTradeAmountType.Contract;
                             security.OptionType = oneSec.optionsType == "Call" ? OptionType.Call : OptionType.Put;
 
                             // https://bybit-exchange.github.io/docs/api-explorer/v5/market/instrument
@@ -765,8 +789,6 @@ namespace OsEngine.Market.Servers.Bybit
 
                         security.PriceStep = oneSec.priceFilter.tickSize.ToDecimal();
                         security.PriceStepCost = oneSec.priceFilter.tickSize.ToDecimal();
-
-                        security.MinTradeAmountType = MinTradeAmountType.C_Currency;
 
                         if (oneSec.lotSizeFilter.qtyStep != null)
                         {
@@ -872,8 +894,12 @@ namespace OsEngine.Market.Servers.Bybit
             CreateQueryPortfolio(true);
         }
 
+        private RateGate _rateGatePortfolio = new RateGate(1, TimeSpan.FromMilliseconds(30));
+
         private void CreateQueryPortfolio(bool IsUpdateValueBegin)
         {
+            _rateGatePortfolio.WaitToProceed();
+
             try
             {
                 Dictionary<string, object> parametrs = new Dictionary<string, object>();
@@ -1030,8 +1056,12 @@ namespace OsEngine.Market.Servers.Bybit
             }
         }
 
+        private RateGate _rateGatePositions = new RateGate(1, TimeSpan.FromMilliseconds(30));
+
         private List<PositionOnBoard> GetPositionsInverse(string portfolioNumber, bool IsUpdateValueBegin)
         {
+            _rateGatePositions.WaitToProceed();
+
             List<PositionOnBoard> positionOnBoards = new List<PositionOnBoard>();
 
             try
@@ -1115,6 +1145,8 @@ namespace OsEngine.Market.Servers.Bybit
 
         private List<PositionOnBoard> GetPositionsSpot(List<Coin> coinList, string portfolioNumber, bool IsUpdateValueBegin)
         {
+            _rateGatePositions.WaitToProceed();
+
             try
             {
                 List<PositionOnBoard> pb = new List<PositionOnBoard>();
@@ -1147,6 +1179,8 @@ namespace OsEngine.Market.Servers.Bybit
 
         private List<PositionOnBoard> GetPositionsLinear(string portfolioNumber, bool IsUpdateValueBegin)
         {
+            _rateGatePositions.WaitToProceed();
+
             List<PositionOnBoard> positionOnBoards = new List<PositionOnBoard>();
 
             try
@@ -1224,7 +1258,7 @@ namespace OsEngine.Market.Servers.Bybit
 
                 pos.PortfolioName = potrolioNumber;
 
-                if (_hedgeMode
+                if (HedgeMode
                     && posJson.symbol.Contains("USDT"))
                 {
                     if (posJson.side == "Buy")
@@ -3730,7 +3764,7 @@ namespace OsEngine.Market.Servers.Bybit
 
                 bool reduceOnly = false;
 
-                if (_hedgeMode
+                if (HedgeMode
                     && order.SecurityClassCode == "LinearPerpetual")
                 {
                     if (order.PositionConditionType == OrderPositionConditionType.Close)
@@ -3759,7 +3793,7 @@ namespace OsEngine.Market.Servers.Bybit
 
                 parameters["orderLinkId"] = order.NumberUser.ToString();
 
-                if (_hedgeMode)
+                if (HedgeMode)
                 {
                     parameters["reduceOnly"] = reduceOnly;
                 }
@@ -3933,7 +3967,7 @@ namespace OsEngine.Market.Servers.Bybit
 
                         if (state == OrderStateType.None)
                         {
-                            SendLogMessage($"Cancel Order Error. {place_order_response}.", LogMessageType.Error);
+                            SendLogMessage($"Cancel Order Error. {order.SecurityNameCode} || {place_order_response}.", LogMessageType.Error);
                             return false;
                         }
                         else
@@ -3948,7 +3982,7 @@ namespace OsEngine.Market.Servers.Bybit
 
                     if (state == OrderStateType.None)
                     {
-                        SendLogMessage($"Cancel Order Error. {place_order_response}.", LogMessageType.Error);
+                        SendLogMessage($"Cancel Order Error. {order.SecurityNameCode} || {place_order_response}.", LogMessageType.Error);
                         return false;
                     }
                     else
@@ -4140,7 +4174,7 @@ namespace OsEngine.Market.Servers.Bybit
                         {
                             newOrder.State = OrderStateType.Active;
                         }
-                        else if(order.orderStatus == "PartiallyFilled")
+                        else if (order.orderStatus == "PartiallyFilled")
                         {
                             newOrder.State = OrderStateType.Partial;
                         }

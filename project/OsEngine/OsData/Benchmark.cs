@@ -1,4 +1,9 @@
-﻿using System;
+﻿/*
+ * Your rights to use code governed by this license https://github.com/AlexWan/OsEngine/blob/master/LICENSE
+ * Ваши права на использование кода регулируются данной лицензией http://o-s-a.net/doc/license_simple_engine.pdf
+*/
+
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -50,6 +55,16 @@ namespace OsEngine.OsData
                 _secClass = "Российские индексы";
                 _secNameFull = "MCFTR";
                 _fileSetBenchmark = @"Data\Benchmark\MCFTR\Day\MCFTR.txt";
+            }
+
+            if (benchmark == BenchmarkSecurity.IMOEX.ToString())
+            {
+                _serverType = ServerType.Finam;
+                _secName = "Индекс МосБиржи";
+                _secId = "420450";
+                _secClass = "Индексы Россия";
+                _secNameFull = "IMOEX";
+                _fileSetBenchmark = @"Data\Benchmark\Индекс МосБиржи\Day\Индекс МосБиржи.txt";
             }
         }
 
@@ -119,7 +134,7 @@ namespace OsEngine.OsData
                     {
                         await Task.Delay(6000, cts.Token).ConfigureAwait(false);
 
-                        DateTime timeStart = DateTime.Parse(_series.Points[0].AxisLabel).AddDays(-5);
+                        DateTime timeStart = DateTime.Parse(_series.Points[0].AxisLabel).AddDays(-30);
                         DateTime timeEnd = DateTime.Parse(_series.Points[^1].AxisLabel).AddDays(1);
 
                         SettingsToLoadSecurity param = new();
@@ -210,6 +225,7 @@ namespace OsEngine.OsData
         Off,
         BTC,
         MCFTR,
-        SnP500
+        SnP500,
+        IMOEX
     }
 }

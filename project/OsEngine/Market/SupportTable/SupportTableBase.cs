@@ -8,6 +8,16 @@ namespace OsEngine.Market.SupportTable
         {
             List<SupportConnection> supportList = new List<SupportConnection>();
 
+            SupportConnection tinvest = new SupportConnection()
+            {
+                ServerType = ServerType.TInvest,
+                SupportType = SupportServerType.Prime,
+                LinqToLogo = "\\Images\\Connections\\Moex\\TInvest.png",
+                LingSiteUrl = "",
+                Discount = 0
+            };
+            supportList.Add(tinvest);
+
             SupportConnection alor = new SupportConnection()
             {
                 ServerType = ServerType.Alor,
@@ -29,16 +39,6 @@ namespace OsEngine.Market.SupportTable
                 Discount = 0
             };
             supportList.Add(transaq);
-
-            SupportConnection tinvest = new SupportConnection()
-            {
-                ServerType = ServerType.TInvest,
-                SupportType = SupportServerType.Prime,
-                LinqToLogo = "\\Images\\Connections\\Moex\\TInvest.png",
-                LingSiteUrl = "",
-                Discount = 0
-            };
-            supportList.Add(tinvest);
 
             SupportConnection quikLua = new SupportConnection()
             {
@@ -375,16 +375,6 @@ namespace OsEngine.Market.SupportTable
                 Discount = 20
             };
             supportList.Add(bloFin);
-
-            SupportConnection bitmex = new SupportConnection()
-            {
-                ServerType = ServerType.BitMex,
-                SupportType = SupportServerType.Standart,
-                LinqToLogo = "\\Images\\Connections\\Crypto\\Bitmex.png",
-                LingSiteUrl = "",
-                Discount = 0
-            };
-            supportList.Add(bitmex);
 
             SupportConnection exMo = new SupportConnection()
             {

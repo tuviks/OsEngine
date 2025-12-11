@@ -242,6 +242,8 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// </summary>
         public string TabName { get; set; }
 
+        public string BotClassName { get; set; }
+
         /// <summary>
         /// Tab number
         /// </summary>
@@ -539,7 +541,7 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// </summary>
         public bool IsNonTradePeriodInConnector
         {
-            get
+            get 
             {
                 if (_connector == null)
                 {
@@ -1343,6 +1345,40 @@ namespace OsEngine.OsTrader.Panels.Tab
         }
 
         /// <summary>
+        /// спред в стакане в процентах
+        /// </summary>
+        public decimal BidAskSpreadPercent
+        {
+            get
+            {
+                decimal ask = PriceBestAsk;
+
+                if (ask == 0)
+                {
+                    return 0;
+                }
+
+                decimal bid = PriceBestBid;
+
+                if (bid == 0)
+                {
+                    return 0;
+                }
+
+                if (bid >= ask)
+                {
+                    return 0;
+                }
+
+                decimal different = ask - bid;
+
+                decimal result = different / (bid / 100);
+
+                return result;
+            }
+        }
+
+        /// <summary>
         /// Does the server support market orders
         /// </summary>
         public bool ServerIsSupportMarketOrders
@@ -1765,7 +1801,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                 if (_connector.IsConnected == false
                     || _connector.IsReadyToTrade == false)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label191, LogMessageType.Error);
+                    SetNewLogMessage(OsLocalization.Trader.Label191 + "\n" + _connector.SecurityName, LogMessageType.Error);
                     return null;
                 }
 
@@ -1776,19 +1812,19 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 if (volume == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label63, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label63 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
                 if (price == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label291, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label291 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
                 if (Security == null || Portfolio == null)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label64, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label64 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
@@ -1828,6 +1864,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                 newDeal.State = PositionStateType.Opening;
 
                 newDeal.NameBot = TabName;
+                newDeal.NameBotClass = this.BotClassName;
                 newDeal.Lots = Security.Lot;
                 newDeal.PriceStepCost = Security.PriceStepCost;
                 newDeal.PriceStep = Security.PriceStep;
@@ -1887,7 +1924,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                 if (_connector.IsConnected == false
                     || _connector.IsReadyToTrade == false)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label191, LogMessageType.Error);
+                    SetNewLogMessage(OsLocalization.Trader.Label191 + "\n" + _connector.SecurityName, LogMessageType.Error);
                     return null;
                 }
 
@@ -1898,13 +1935,13 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 if (volume == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label63, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label63 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
                 if (Security == null || Portfolio == null)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label64, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label64 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
@@ -1914,6 +1951,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                 newDeal.State = PositionStateType.Opening;
 
                 newDeal.NameBot = TabName;
+                newDeal.NameBotClass = this.BotClassName;
                 newDeal.Lots = Security.Lot;
                 newDeal.PriceStepCost = Security.PriceStepCost;
                 newDeal.PriceStep = Security.PriceStep;
@@ -1976,20 +2014,20 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 if (volume == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label63,
+                    SetNewLogMessage(OsLocalization.Trader.Label63 + "\n" + _connector.SecurityName,
                         LogMessageType.System);
                     return null;
                 }
 
                 if (price == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label291, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label291 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
                 if (Security == null || Portfolio == null)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label64, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label64 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
                 price = RoundPrice(price, Security, direction);
@@ -2000,6 +2038,8 @@ namespace OsEngine.OsTrader.Panels.Tab
                     Security, Portfolio, StartProgram, 
                     ManualPositionSupport.OrderTypeTime,
                     ManualPositionSupport.LimitsMakerOnly);
+
+                newDeal.NameBotClass = this.BotClassName;
 
                 _journal.SetNewDeal(newDeal);
 
@@ -2029,20 +2069,20 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 if (volume == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label63,
+                    SetNewLogMessage(OsLocalization.Trader.Label63 + "\n" + _connector.SecurityName,
                         LogMessageType.System);
                     return null;
                 }
 
                 if (price == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label291, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label291 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
                 if (Security == null || Portfolio == null)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label64, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label64 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
                 price = RoundPrice(price, Security, direction);
@@ -2052,6 +2092,8 @@ namespace OsEngine.OsTrader.Panels.Tab
                     ManualPositionSupport.SecondToOpen, Security, Portfolio, 
                     StartProgram, ManualPositionSupport.OrderTypeTime,
                     ManualPositionSupport.LimitsMakerOnly);
+
+                newDeal.NameBotClass = this.BotClassName;
 
                 newDeal.SignalTypeOpen = signalType;
 
@@ -2439,19 +2481,19 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 if (volume == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label63, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label63 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return;
                 }
 
                 if (price == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label291, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label291 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return;
                 }
 
                 if (Security == null || Portfolio == null)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label64, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label64 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return;
                 }
 
@@ -2521,13 +2563,13 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 if (volume == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label63, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label63 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return;
                 }
 
                 if (Security == null || Portfolio == null)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label64, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label64 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return;
                 }
 
@@ -2822,7 +2864,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                 if (_connector.IsConnected == false
                     || _connector.IsReadyToTrade == false)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label191, LogMessageType.Error);
+                    SetNewLogMessage(OsLocalization.Trader.Label191 + "\n" + _connector.SecurityName, LogMessageType.Error);
                     return null;
                 }
 
@@ -2833,19 +2875,19 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 if (volume == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label63, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label63 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
                 if (price == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label291, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label291 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
                 if (Security == null || Portfolio == null)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label64, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label64 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
@@ -2885,6 +2927,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                 newDeal.State = PositionStateType.Opening;
 
                 newDeal.NameBot = TabName;
+                newDeal.NameBotClass = this.BotClassName;
                 newDeal.Lots = Security.Lot;
                 newDeal.PriceStepCost = Security.PriceStepCost;
                 newDeal.PriceStep = Security.PriceStep;
@@ -2951,7 +2994,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                 if (_connector.IsConnected == false
                     || _connector.IsReadyToTrade == false)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label191, LogMessageType.Error);
+                    SetNewLogMessage(OsLocalization.Trader.Label191 + "\n" + _connector.SecurityName, LogMessageType.Error);
                     return null;
                 }
 
@@ -2962,13 +3005,13 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 if (volume == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label63, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label63 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
                 if (Security == null || Portfolio == null)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label64, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label64 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
@@ -2979,6 +3022,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                 newDeal.State = PositionStateType.Opening;
 
                 newDeal.NameBot = TabName;
+                newDeal.NameBotClass = this.BotClassName;
                 newDeal.Lots = Security.Lot;
                 newDeal.PriceStepCost = Security.PriceStepCost;
                 newDeal.PriceStep = Security.PriceStep;
@@ -3048,20 +3092,20 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 if (volume == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label63,
+                    SetNewLogMessage(OsLocalization.Trader.Label63 + "\n" + _connector.SecurityName,
                         LogMessageType.System);
                     return null;
                 }
 
                 if (price == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label291, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label291 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
                 if (Security == null || Portfolio == null)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label64, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label64 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
@@ -3072,6 +3116,8 @@ namespace OsEngine.OsTrader.Panels.Tab
                     ManualPositionSupport.SecondToOpen, Security, Portfolio, 
                     StartProgram, ManualPositionSupport.OrderTypeTime,
                     ManualPositionSupport.LimitsMakerOnly);
+
+                newDeal.NameBotClass = this.BotClassName;
 
                 _journal.SetNewDeal(newDeal);
 
@@ -3101,20 +3147,20 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 if (volume == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label63,
+                    SetNewLogMessage(OsLocalization.Trader.Label63 + "\n" + _connector.SecurityName,
                         LogMessageType.System);
                     return null;
                 }
 
                 if (price == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label291, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label291 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
                 if (Security == null || Portfolio == null)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label64, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label64 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
@@ -3125,6 +3171,8 @@ namespace OsEngine.OsTrader.Panels.Tab
                     ManualPositionSupport.SecondToOpen, Security, Portfolio, 
                     StartProgram, ManualPositionSupport.OrderTypeTime,
                     ManualPositionSupport.LimitsMakerOnly);
+
+                newDeal.NameBotClass = this.BotClassName;
 
                 newDeal.SignalTypeOpen = signalType;
 
@@ -3495,7 +3543,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                 if (_connector.IsConnected == false
                    || _connector.IsReadyToTrade == false)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label191, LogMessageType.Error);
+                    SetNewLogMessage(OsLocalization.Trader.Label191 + "\n" + _connector.SecurityName, LogMessageType.Error);
                     return;
                 }
 
@@ -3513,19 +3561,19 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 if (volume == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label63, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label63 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return;
                 }
 
                 if (price == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label291, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label291 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return;
                 }
 
                 if (Security == null || Portfolio == null)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label64, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label64 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return;
                 }
 
@@ -3583,7 +3631,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                 if (_connector.IsConnected == false
                    || _connector.IsReadyToTrade == false)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label191, LogMessageType.Error);
+                    SetNewLogMessage(OsLocalization.Trader.Label191 + "\n" + _connector.SecurityName, LogMessageType.Error);
                     return;
                 }
 
@@ -3595,13 +3643,13 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 if (volume == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label63, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label63 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return;
                 }
 
                 if (Security == null || Portfolio == null)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label64, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label64 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return;
                 }
 
@@ -4663,20 +4711,20 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 if (volume == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label63,
+                    SetNewLogMessage(OsLocalization.Trader.Label63 + "\n" + _connector.SecurityName,
                         LogMessageType.System);
                     return null;
                 }
 
                 if (price == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label291, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label291 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
                 if (Security == null || Portfolio == null)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label64, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label64 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
@@ -4687,6 +4735,8 @@ namespace OsEngine.OsTrader.Panels.Tab
                     timeLife, Security, Portfolio, StartProgram, 
                     ManualPositionSupport.OrderTypeTime,
                     ManualPositionSupport.LimitsMakerOnly);
+
+                newDeal.NameBotClass = this.BotClassName;
 
                 newDeal.OpenOrders[0].IsStopOrProfit = isStopOrProfit;
                 _journal.SetNewDeal(newDeal);
@@ -4719,19 +4769,19 @@ namespace OsEngine.OsTrader.Panels.Tab
             {
                 if (volume == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label63, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label63 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return;
                 }
 
                 if (price == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label291, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label291 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return;
                 }
 
                 if (Security == null || Portfolio == null)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label64, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label64 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return;
                 }
 
@@ -4803,19 +4853,19 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 if (volume == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label63, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label63 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
                 if (price == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label291, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label291 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
                 if (Security == null || Portfolio == null)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label64, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label64 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return null;
                 }
 
@@ -4826,6 +4876,8 @@ namespace OsEngine.OsTrader.Panels.Tab
                     timeLife, Security, Portfolio, StartProgram, 
                     ManualPositionSupport.OrderTypeTime,
                     ManualPositionSupport.LimitsMakerOnly);
+
+                newDeal.NameBotClass = this.BotClassName;
 
                 newDeal.OpenOrders[0].IsStopOrProfit = isStopOrProfit;
                 _journal.SetNewDeal(newDeal);
@@ -4858,19 +4910,19 @@ namespace OsEngine.OsTrader.Panels.Tab
             {
                 if (volume == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label63, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label63 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return;
                 }
 
                 if (price == 0)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label291, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label291 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return;
                 }
 
                 if (Security == null || Portfolio == null)
                 {
-                    SetNewLogMessage(OsLocalization.Trader.Label64, LogMessageType.System);
+                    SetNewLogMessage(OsLocalization.Trader.Label64 + "\n" + _connector.SecurityName, LogMessageType.System);
                     return;
                 }
 
@@ -6647,7 +6699,15 @@ namespace OsEngine.OsTrader.Panels.Tab
                     _lastTradeIndex == 0)
                 {
                     _lastTradeIndex = trades.Count;
-                    _lastTradeTime = trades[trades.Count - 1].Time;
+                    try
+                    {
+                        _lastTradeTime = trades[trades.Count - 1].Time;
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                   
                     return;
                 }
             }
